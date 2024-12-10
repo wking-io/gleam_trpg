@@ -1,7 +1,6 @@
-import app/pages/playground
 import app/layouts/doc
+import app/pages/playground
 import app/web
-import gleam/io
 import lustre/element
 import wisp.{type Request, type Response}
 
