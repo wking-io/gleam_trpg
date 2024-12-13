@@ -1,4 +1,7 @@
 *.beam
 *.ez
-/build
+server/build
+client/build
+lib/build
 erl_crash.dump
+.DS_Store
