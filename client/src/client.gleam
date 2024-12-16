@@ -1,5 +1,9 @@
 // IMPORTS ---------------------------------------------------------------------
 
+import gleam/float
+import gleam/list
+import gleam/order.{type Order}
+import gleam/result
 import lib/canvas/context as context_impl
 import lib/engine
 import lib/render
@@ -23,7 +27,49 @@ pub fn main() {
 type Model {
   Idle
   NoCanvas
-  Ready(previous_time: Float, accumulator: Float, event_queue: List(string))
+  Ready(game_state: GameState)
+}
+
+type GameState {
+  GameState(
+    previous_time: Float,
+    accumulator: Float,
+    event_queue: List(Event),
+    cursor_x: Int,
+    cursor_y: Int,
+    cursor_animation: CursorAnimation,
+  )
+}
+
+type CursorAnimation {
+  CursorIdle(elapsed: Float, cycle: Float, amplitude: Float)
+  CursorMoving(
+    start_x: Int,
+    start_y: Int,
+    target_x: Int,
+    target_y: Int,
+    elapsed: Float,
+    duration: Float,
+  )
+}
+
+type Direction {
+  Up
+  Down
+  Right
+  Left
+}
+
+type Vector =
+  #(Int, Int)
+
+fn direction_to_vector(direction: Direction) -> Vector {
+  case direction {
+    Up -> #(0, -1)
+    Down -> #(0, 1)
+    Left -> #(-1, 0)
+    Right -> #(1, 0)
+  }
 }
 
 fn init(_) -> #(Model, Effect(Msg)) {
@@ -33,52 +79,185 @@ fn init(_) -> #(Model, Effect(Msg)) {
 // UPDATE ----------------------------------------------------------------------
 
 type Msg {
-  AppInitCanvas
+  AppInitCanvas(Float)
   AppSetNoCanvas
   Tick(Float)
+  PlayerQueueEvent(Event)
 }
+
+type Event {
+  MoveCursor(direction: Direction)
+}
+
+const cursor_idle_info = CursorIdle(0.0, 2.0, 3.0)
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
-    AppInitCanvas -> #(Ready, effect.none())
+    AppInitCanvas(previous_time) -> #(
+      Ready(GameState(previous_time, 0.0, [], 0, 0, cursor_idle_info)),
+      setup_listeners(),
+    )
     AppSetNoCanvas -> #(NoCanvas, effect.none())
-    Tick(current_time) -> engine_update(model, current_time)
-  }
-}
-
-const ffps = 60.0
-const fixed_dt = 1000.0 / 60.0 
-
-fn engine_update(model: Model, current_time: Flaot) -> #(Model, Effect(Msg)) {
-  case model {
-    Ready(previous_time) -> {
-      let frame_time = current_time - model.previous_time
-      let accumulator = model.accumulator + frame_time 
-
-      let updated_model = Ready(..model, previous_time: current_time, accumulator: accumulator)
-      let final_model = engine_update_loop(updated_model, accumulator)
-      #(final_model, schedule_next_frame())
+    Tick(current_time) -> {
+      case model {
+        Ready(game_state) ->
+          engine_update(game_state, current_time)
+          |> update_and_schedule
+        _ -> panic
+      }
     }
-    _ -> #(model, effect.none())
+    PlayerQueueEvent(event) -> {
+      case model {
+        Ready(game_state) -> #(
+          Ready(
+            GameState(
+              ..game_state,
+              event_queue: [event, ..game_state.event_queue],
+            ),
+          ),
+          effect.none(),
+        )
+        _ -> panic
+      }
+    }
   }
 }
 
-fn engine_update_loop(model: Model, acc: Float) -> Model {
-  if (model.event_queue) 
-  if (acc >= fixed_dt) {
-    engine_update_loop(model, acc - fixed_dt)
-} else {
-  Model(..model, accumulator: acc)
+fn setup_listeners() {
+  effect.from(fn(dispatch) {
+    engine.on_keyboard_event(fn(game_key) {
+      let direction = direction_from_game_key(game_key)
+      dispatch(PlayerQueueEvent(MoveCursor(direction)))
+    })
+  })
 }
+
+fn direction_from_game_key(game_key: engine.GameKey) -> Direction {
+  case game_key {
+    engine.UpKey -> Up
+    engine.DownKey -> Down
+    engine.LeftKey -> Left
+    engine.RightKey -> Right
+  }
+}
+
+fn update_and_schedule(game_state: GameState) -> #(Model, Effect(Msg)) {
+  #(Ready(game_state), schedule_next_frame())
+}
+
+const fixed_dt = 16.67
+
+fn engine_update(game_state: GameState, current_time: Float) -> GameState {
+  let frame_time = float.subtract(current_time, game_state.previous_time)
+  let accumulator = float.add(game_state.accumulator, frame_time)
+  let updated_state =
+    GameState(
+      ..game_state,
+      previous_time: current_time,
+      accumulator: accumulator,
+    )
+  engine_update_loop(updated_state, accumulator)
+}
+
+fn engine_update_loop(game_state: GameState, acc: Float) -> GameState {
+  case
+    !list.is_empty(game_state.event_queue)
+    && float.compare(acc, fixed_dt) |> is_gt_or_eq
+  {
+    True -> {
+      let dt_seconds = float.divide(fixed_dt, 1000.0) |> result.unwrap(0.0)
+      game_state
+      |> apply_events(game_state.event_queue)
+      |> run_logic_update(dt_seconds)
+      |> engine_update_loop(float.subtract(acc, fixed_dt))
+    }
+    False -> game_state
+  }
+}
+
+fn apply_events(game_state: GameState, events: List(Event)) -> GameState {
+  list.fold_right(events, game_state, fn(acc, event) {
+    case event {
+      MoveCursor(direction) -> {
+        case game_state.cursor_animation {
+          CursorIdle(..) -> {
+            let #(dx, dy) = direction_to_vector(direction)
+            let new_x = acc.cursor_x + dx
+            let new_y = acc.cursor_y + dy
+            GameState(
+              ..game_state,
+              cursor_x: new_x,
+              cursor_y: new_y,
+              cursor_animation: CursorMoving(
+                start_x: game_state.cursor_x,
+                start_y: game_state.cursor_y,
+                target_x: new_x,
+                target_y: new_y,
+                elapsed: 0.0,
+                duration: 1.0,
+              ),
+            )
+          }
+          _ -> {
+            acc
+          }
+        }
+      }
+    }
+  })
+  |> reset_events
+}
+
+fn run_logic_update(game_state: GameState, dt_seconds: Float) {
+  let new_cursor_animation = case game_state.cursor_animation {
+    CursorIdle(elapsed, cycle, amplitude) -> {
+      let looped_elapsed =
+        elapsed
+        |> float.add(dt_seconds)
+        |> float.modulo(cycle)
+        |> result.unwrap(0.0)
+      CursorIdle(elapsed: looped_elapsed, cycle: cycle, amplitude: amplitude)
+    }
+    CursorMoving(start_x, start_y, target_x, target_y, elapsed, duration) -> {
+      let new_elapsed = float.add(elapsed, dt_seconds)
+      case float.compare(new_elapsed, duration) {
+        order.Lt -> {
+          CursorMoving(
+            start_x: start_x,
+            start_y: start_y,
+            target_x: target_x,
+            target_y: target_y,
+            elapsed: new_elapsed,
+            duration: duration,
+          )
+        }
+        _ -> {
+          cursor_idle_info
+        }
+      }
+    }
+  }
+  GameState(..game_state, cursor_animation: new_cursor_animation)
+}
+
+fn reset_events(game_state: GameState) -> GameState {
+  GameState(..game_state, event_queue: [])
+}
+
+fn is_gt_or_eq(order: Order) -> Bool {
+  case order {
+    order.Lt -> False
+    _ -> True
+  }
 }
 
 fn init_canvas() {
   effect.from(fn(dispatch) {
-    engine.request_animation_frame(fn(_timestamp) {
+    engine.request_animation_frame(fn(timestamp) {
       case render.with_context() {
         Ok(render.RenderContext(_canvas, context)) -> {
           context_impl.fill_rect(context, 0.0, 0.0, 100.0, 100.0)
-          dispatch(AppInitCanvas)
+          dispatch(AppInitCanvas(timestamp))
         }
         _ -> dispatch(AppSetNoCanvas)
       }
@@ -88,8 +267,7 @@ fn init_canvas() {
 
 fn schedule_next_frame() {
   effect.from(fn(dispatch) {
-    engine.request_animation_frame(fn(timestamp) {
-
+    engine.request_animation_frame(fn(timestamp) { dispatch(Tick(timestamp)) })
   })
 }
 
@@ -105,7 +283,7 @@ fn view(model: Model) -> Element(Msg) {
 fn render(model: Model) -> Element(Msg) {
   let text = case model {
     NoCanvas -> "No canvas available"
-    Ready -> "It worked"
+    Ready(..) -> "It worked"
     Idle -> "Initializing"
   }
   element.text(text)
