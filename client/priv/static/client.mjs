@@ -2079,6 +2079,10 @@ function set_fill_style(context, style2) {
   context.fillStyle = style2;
   return context;
 }
+function clear_rect(context, x, y, width, height) {
+  context.clearRect(x, y, width, height);
+  return context;
+}
 function fill_rect(context, x, y, width, height) {
   context.fillRect(x, y, width, height);
   return context;
@@ -2381,8 +2385,8 @@ function render(game_state) {
                   let _pipe2 = t;
                   let _pipe$12 = multiply(_pipe2, 2);
                   let _pipe$22 = multiply(_pipe$12, pi2());
-                  let _pipe$3 = sin2(_pipe$22);
-                  let _pipe$4 = multiply(_pipe$3, amplitude);
+                  let _pipe$32 = sin2(_pipe$22);
+                  let _pipe$4 = multiply(_pipe$32, amplitude);
                   return add2(_pipe$4, sy);
                 })();
                 return vector_move([sx, offset_y], [2.5, 2.5]);
@@ -2402,21 +2406,28 @@ function render(game_state) {
             let cursor_x = $1[0];
             let cursor_y = $1[1];
             let _pipe = context;
-            let _pipe$1 = stroke_rect(
+            let _pipe$1 = clear_rect(
               _pipe,
               0,
               0,
               100,
               100
             );
-            let _pipe$2 = set_fill_style(_pipe$1, "#FCE800");
-            fill_rect(_pipe$2, cursor_x, cursor_y, 5, 5);
+            let _pipe$2 = stroke_rect(
+              _pipe$1,
+              0,
+              0,
+              100,
+              100
+            );
+            let _pipe$3 = set_fill_style(_pipe$2, "#FA470A");
+            fill_rect(_pipe$3, cursor_x, cursor_y, 5, 5);
             return void 0;
           } else {
             throw makeError(
               "panic",
               "client",
-              300,
+              301,
               "",
               "`panic` expression evaluated.",
               {}
@@ -2460,7 +2471,7 @@ function view(_) {
     toList([canvas(toList([id(render_target_id)]))])
   );
 }
-var cursor_idle_info = /* @__PURE__ */ new CursorIdle(0, 2, 3);
+var cursor_idle_info = /* @__PURE__ */ new CursorIdle(0, 2, 1);
 function run_logic_update(game_state, dt_seconds) {
   let new_cursor_animation = (() => {
     let $ = game_state.cursor_animation;

@@ -82,7 +82,7 @@ type Event {
   MoveCursor(direction: Direction)
 }
 
-const cursor_idle_info = CursorIdle(0.0, 2.0, 3.0)
+const cursor_idle_info = CursorIdle(0.0, 2.0, 1.0)
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
@@ -292,8 +292,9 @@ fn render(game_state: GameState) -> Effect(Msg) {
           }
 
           context
+          |> context_impl.clear_rect(0.0, 0.0, 100.0, 100.0)
           |> context_impl.stroke_rect(0.0, 0.0, 100.0, 100.0)
-          |> context_impl.set_fill_style("#FCE800")
+          |> context_impl.set_fill_style("#FA470A")
           |> context_impl.fill_rect(cursor_x, cursor_y, 5.0, 5.0)
           Nil
         }
