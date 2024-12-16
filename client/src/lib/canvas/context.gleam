@@ -116,3 +116,14 @@ pub fn measure_text(
   context: CanvasRenderingContext2D,
   text: String,
 ) -> TextMetrics
+
+// Draw a shape at (x, y) that is size (width, height)
+//
+@external(javascript, "../../client_lib_canvas_ffi.mjs", "stroke_rect")
+pub fn stroke_rect(
+  context: CanvasRenderingContext2D,
+  x: Float,
+  y: Float,
+  width: Float,
+  height: Float,
+) -> CanvasRenderingContext2D

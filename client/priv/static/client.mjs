@@ -169,6 +169,13 @@ function structurallyCompatibleObjects(a, b) {
     return false;
   return a.constructor === b.constructor;
 }
+function divideFloat(a, b) {
+  if (b === 0) {
+    return 0;
+  } else {
+    return a / b;
+  }
+}
 function makeError(variant, module, line, fn, message, extra) {
   let error = new globalThis.Error(message);
   error.gleam_error = variant;
@@ -181,9 +188,176 @@ function makeError(variant, module, line, fn, message, extra) {
   return error;
 }
 
+// build/dev/javascript/gleam_stdlib/gleam/order.mjs
+var Lt = class extends CustomType {
+};
+var Eq = class extends CustomType {
+};
+var Gt = class extends CustomType {
+};
+
 // build/dev/javascript/gleam_stdlib/gleam/option.mjs
 var None = class extends CustomType {
 };
+
+// build/dev/javascript/gleam_stdlib/gleam/dict.mjs
+function insert(dict, key, value) {
+  return map_insert(key, value, dict);
+}
+function reverse_and_concat(loop$remaining, loop$accumulator) {
+  while (true) {
+    let remaining = loop$remaining;
+    let accumulator = loop$accumulator;
+    if (remaining.hasLength(0)) {
+      return accumulator;
+    } else {
+      let item = remaining.head;
+      let rest = remaining.tail;
+      loop$remaining = rest;
+      loop$accumulator = prepend(item, accumulator);
+    }
+  }
+}
+function do_keys_loop(loop$list, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let acc = loop$acc;
+    if (list.hasLength(0)) {
+      return reverse_and_concat(acc, toList([]));
+    } else {
+      let first2 = list.head;
+      let rest = list.tail;
+      loop$list = rest;
+      loop$acc = prepend(first2[0], acc);
+    }
+  }
+}
+function keys(dict) {
+  let list_of_pairs = map_to_list(dict);
+  return do_keys_loop(list_of_pairs, toList([]));
+}
+
+// build/dev/javascript/gleam_stdlib/gleam/list.mjs
+function reverse_loop(loop$remaining, loop$accumulator) {
+  while (true) {
+    let remaining = loop$remaining;
+    let accumulator = loop$accumulator;
+    if (remaining.hasLength(0)) {
+      return accumulator;
+    } else {
+      let item = remaining.head;
+      let rest$1 = remaining.tail;
+      loop$remaining = rest$1;
+      loop$accumulator = prepend(item, accumulator);
+    }
+  }
+}
+function reverse(list) {
+  return reverse_loop(list, toList([]));
+}
+function append_loop(loop$first, loop$second) {
+  while (true) {
+    let first2 = loop$first;
+    let second = loop$second;
+    if (first2.hasLength(0)) {
+      return second;
+    } else {
+      let item = first2.head;
+      let rest$1 = first2.tail;
+      loop$first = rest$1;
+      loop$second = prepend(item, second);
+    }
+  }
+}
+function append(first2, second) {
+  return append_loop(reverse(first2), second);
+}
+function fold(loop$list, loop$initial, loop$fun) {
+  while (true) {
+    let list = loop$list;
+    let initial = loop$initial;
+    let fun = loop$fun;
+    if (list.hasLength(0)) {
+      return initial;
+    } else {
+      let x = list.head;
+      let rest$1 = list.tail;
+      loop$list = rest$1;
+      loop$initial = fun(initial, x);
+      loop$fun = fun;
+    }
+  }
+}
+function fold_right(list, initial, fun) {
+  if (list.hasLength(0)) {
+    return initial;
+  } else {
+    let x = list.head;
+    let rest$1 = list.tail;
+    return fun(fold_right(rest$1, initial, fun), x);
+  }
+}
+function index_fold_loop(loop$over, loop$acc, loop$with, loop$index) {
+  while (true) {
+    let over = loop$over;
+    let acc = loop$acc;
+    let with$ = loop$with;
+    let index2 = loop$index;
+    if (over.hasLength(0)) {
+      return acc;
+    } else {
+      let first$1 = over.head;
+      let rest$1 = over.tail;
+      loop$over = rest$1;
+      loop$acc = with$(acc, first$1, index2);
+      loop$with = with$;
+      loop$index = index2 + 1;
+    }
+  }
+}
+function index_fold(list, initial, fun) {
+  return index_fold_loop(list, initial, fun, 0);
+}
+
+// build/dev/javascript/gleam_stdlib/gleam/string.mjs
+function drop_start(loop$string, loop$num_graphemes) {
+  while (true) {
+    let string2 = loop$string;
+    let num_graphemes = loop$num_graphemes;
+    let $ = num_graphemes > 0;
+    if (!$) {
+      return string2;
+    } else {
+      let $1 = pop_grapheme(string2);
+      if ($1.isOk()) {
+        let string$1 = $1[0][1];
+        loop$string = string$1;
+        loop$num_graphemes = num_graphemes - 1;
+      } else {
+        return string2;
+      }
+    }
+  }
+}
+
+// build/dev/javascript/gleam_stdlib/gleam/result.mjs
+function try$(result, fun) {
+  if (result.isOk()) {
+    let x = result[0];
+    return fun(x);
+  } else {
+    let e = result[0];
+    return new Error(e);
+  }
+}
+function unwrap(result, default$) {
+  if (result.isOk()) {
+    let v = result[0];
+    return v;
+  } else {
+    return default$;
+  }
+}
 
 // build/dev/javascript/gleam_stdlib/dict.mjs
 var referenceMap = /* @__PURE__ */ new WeakMap();
@@ -942,6 +1116,9 @@ var unicode_whitespaces = [
 ].join("");
 var trim_start_regex = new RegExp(`^[${unicode_whitespaces}]*`);
 var trim_end_regex = new RegExp(`[${unicode_whitespaces}]*$`);
+function floor(float2) {
+  return Math.floor(float2);
+}
 function new_map() {
   return Dict.new();
 }
@@ -952,112 +1129,59 @@ function map_insert(key, value, map4) {
   return map4.set(key, value);
 }
 
-// build/dev/javascript/gleam_stdlib/gleam/dict.mjs
-function insert(dict, key, value) {
-  return map_insert(key, value, dict);
-}
-function reverse_and_concat(loop$remaining, loop$accumulator) {
-  while (true) {
-    let remaining = loop$remaining;
-    let accumulator = loop$accumulator;
-    if (remaining.hasLength(0)) {
-      return accumulator;
-    } else {
-      let item = remaining.head;
-      let rest = remaining.tail;
-      loop$remaining = rest;
-      loop$accumulator = prepend(item, accumulator);
-    }
-  }
-}
-function do_keys_loop(loop$list, loop$acc) {
-  while (true) {
-    let list = loop$list;
-    let acc = loop$acc;
-    if (list.hasLength(0)) {
-      return reverse_and_concat(acc, toList([]));
-    } else {
-      let first2 = list.head;
-      let rest = list.tail;
-      loop$list = rest;
-      loop$acc = prepend(first2[0], acc);
-    }
-  }
-}
-function keys(dict) {
-  let list_of_pairs = map_to_list(dict);
-  return do_keys_loop(list_of_pairs, toList([]));
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/list.mjs
-function fold(loop$list, loop$initial, loop$fun) {
-  while (true) {
-    let list = loop$list;
-    let initial = loop$initial;
-    let fun = loop$fun;
-    if (list.hasLength(0)) {
-      return initial;
-    } else {
-      let x = list.head;
-      let rest$1 = list.tail;
-      loop$list = rest$1;
-      loop$initial = fun(initial, x);
-      loop$fun = fun;
-    }
-  }
-}
-function index_fold_loop(loop$over, loop$acc, loop$with, loop$index) {
-  while (true) {
-    let over = loop$over;
-    let acc = loop$acc;
-    let with$ = loop$with;
-    let index2 = loop$index;
-    if (over.hasLength(0)) {
-      return acc;
-    } else {
-      let first$1 = over.head;
-      let rest$1 = over.tail;
-      loop$over = rest$1;
-      loop$acc = with$(acc, first$1, index2);
-      loop$with = with$;
-      loop$index = index2 + 1;
-    }
-  }
-}
-function index_fold(list, initial, fun) {
-  return index_fold_loop(list, initial, fun, 0);
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/string.mjs
-function drop_start(loop$string, loop$num_graphemes) {
-  while (true) {
-    let string2 = loop$string;
-    let num_graphemes = loop$num_graphemes;
-    let $ = num_graphemes > 0;
-    if (!$) {
-      return string2;
-    } else {
-      let $1 = pop_grapheme(string2);
-      if ($1.isOk()) {
-        let string$1 = $1[0][1];
-        loop$string = string$1;
-        loop$num_graphemes = num_graphemes - 1;
-      } else {
-        return string2;
-      }
-    }
-  }
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/result.mjs
-function try$(result, fun) {
-  if (result.isOk()) {
-    let x = result[0];
-    return fun(x);
+// build/dev/javascript/gleam_stdlib/gleam/float.mjs
+function compare(a, b) {
+  let $ = a === b;
+  if ($) {
+    return new Eq();
   } else {
-    let e = result[0];
-    return new Error(e);
+    let $1 = a < b;
+    if ($1) {
+      return new Lt();
+    } else {
+      return new Gt();
+    }
   }
+}
+function modulo(dividend, divisor) {
+  if (divisor === 0) {
+    return new Error(void 0);
+  } else {
+    return new Ok(dividend - floor(divideFloat(dividend, divisor)) * divisor);
+  }
+}
+function divide(a, b) {
+  if (b === 0) {
+    return new Error(void 0);
+  } else {
+    let b$1 = b;
+    return new Ok(divideFloat(a, b$1));
+  }
+}
+function add2(a, b) {
+  return a + b;
+}
+function multiply(a, b) {
+  return a * b;
+}
+function subtract(a, b) {
+  return a - b;
+}
+
+// build/dev/javascript/gleam_community_maths/maths.mjs
+function sin(float2) {
+  return Math.sin(float2);
+}
+function pi() {
+  return Math.PI;
+}
+
+// build/dev/javascript/gleam_community_maths/gleam_community/maths/elementary.mjs
+function sin2(x) {
+  return sin(x);
+}
+function pi2() {
+  return pi();
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/bool.mjs
@@ -1092,6 +1216,18 @@ function from(effect) {
 }
 function none() {
   return new Effect(toList([]));
+}
+function batch(effects) {
+  return new Effect(
+    fold(
+      effects,
+      toList([]),
+      (b, _use1) => {
+        let a = _use1.all;
+        return append(b, a);
+      }
+    )
+  );
 }
 
 // build/dev/javascript/lustre/lustre/internals/vdom.mjs
@@ -1225,9 +1361,6 @@ function element(tag, attrs, children2) {
   } else {
     return new Element("", "", tag, attrs, children2, false, false);
   }
-}
-function text(content) {
-  return new Text(content);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/set.mjs
@@ -1920,9 +2053,6 @@ function start2(app, selector, flags) {
 }
 
 // build/dev/javascript/lustre/lustre/element/html.mjs
-function h1(attrs, children2) {
-  return element("h1", attrs, children2);
-}
 function div(attrs, children2) {
   return element("div", attrs, children2);
 }
@@ -1945,15 +2075,82 @@ function get_context_2d(canvas2) {
   }
   return new Ok(context);
 }
+function set_fill_style(context, style2) {
+  context.fillStyle = style2;
+  return context;
+}
 function fill_rect(context, x, y, width, height) {
-  console.log(context);
   context.fillRect(x, y, width, height);
   return context;
 }
+function stroke_rect(context, x, y, width, height) {
+  context.strokeRect(x, y, width, height);
+  return context;
+}
 
-// build/dev/javascript/client/client_lib_enginee_ffi.mjs
+// build/dev/javascript/client/client_lib_engine_ffi.mjs
 function request_animation_frame(cb) {
   window.requestAnimationFrame(cb);
+}
+function with_keyboard_data(cb) {
+  return function listener(e) {
+    return cb({
+      key: e.key,
+      alt_key: e.altKey,
+      ctrl_key: e.ctrlKey,
+      meta_key: e.metaKey,
+      repeat: e.repeat,
+      shift_key: e.shiftKey
+    });
+  };
+}
+function add_keyboard_event_listener(cb) {
+  return window.addEventListener("keydown", with_keyboard_data(cb));
+}
+
+// build/dev/javascript/client/lib/engine.mjs
+var UpKey = class extends CustomType {
+};
+var DownKey = class extends CustomType {
+};
+var LeftKey = class extends CustomType {
+};
+var RightKey = class extends CustomType {
+};
+function decode_game_key(event) {
+  let $ = event.key;
+  if ($ === "ArrowUp") {
+    return new Ok(new UpKey());
+  } else if ($ === "w") {
+    return new Ok(new UpKey());
+  } else if ($ === "ArrowDown") {
+    return new Ok(new DownKey());
+  } else if ($ === "s") {
+    return new Ok(new DownKey());
+  } else if ($ === "ArrowLeft") {
+    return new Ok(new LeftKey());
+  } else if ($ === "a") {
+    return new Ok(new LeftKey());
+  } else if ($ === "ArrowRight") {
+    return new Ok(new RightKey());
+  } else if ($ === "d") {
+    return new Ok(new RightKey());
+  } else {
+    return new Error("Unsupported key");
+  }
+}
+function on_keyboard_event(cb) {
+  return add_keyboard_event_listener(
+    (event) => {
+      let $ = decode_game_key(event);
+      if ($.isOk()) {
+        let game_key = $[0];
+        return cb(game_key);
+      } else {
+        return void 0;
+      }
+    }
+  );
 }
 
 // build/dev/javascript/client/lib/render.mjs
@@ -1983,40 +2180,269 @@ var Idle = class extends CustomType {
 var NoCanvas = class extends CustomType {
 };
 var Ready = class extends CustomType {
+  constructor(game_state) {
+    super();
+    this.game_state = game_state;
+  }
+};
+var GameState = class extends CustomType {
+  constructor(previous_time, accumulator, event_queue, cursor, cursor_animation) {
+    super();
+    this.previous_time = previous_time;
+    this.accumulator = accumulator;
+    this.event_queue = event_queue;
+    this.cursor = cursor;
+    this.cursor_animation = cursor_animation;
+  }
+};
+var CursorIdle = class extends CustomType {
+  constructor(elapsed, cycle, amplitude) {
+    super();
+    this.elapsed = elapsed;
+    this.cycle = cycle;
+    this.amplitude = amplitude;
+  }
+};
+var CursorMoving = class extends CustomType {
+  constructor(start3, target, elapsed, duration) {
+    super();
+    this.start = start3;
+    this.target = target;
+    this.elapsed = elapsed;
+    this.duration = duration;
+  }
+};
+var Up = class extends CustomType {
+};
+var Down = class extends CustomType {
+};
+var Right = class extends CustomType {
+};
+var Left = class extends CustomType {
 };
 var AppInitCanvas = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
 };
 var AppSetNoCanvas = class extends CustomType {
 };
-function update(_, msg) {
-  if (msg instanceof AppInitCanvas) {
-    return [new Ready(), none()];
+var Tick = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var PlayerQueueEvent = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var MoveCursor = class extends CustomType {
+  constructor(direction) {
+    super();
+    this.direction = direction;
+  }
+};
+function direction_to_vector(direction) {
+  if (direction instanceof Up) {
+    return [0, -1];
+  } else if (direction instanceof Down) {
+    return [0, 1];
+  } else if (direction instanceof Left) {
+    return [-1, 0];
   } else {
-    return [new NoCanvas(), none()];
+    return [1, 0];
   }
 }
-function render(model) {
-  let text2 = (() => {
-    if (model instanceof NoCanvas) {
-      return "No canvas available";
-    } else if (model instanceof Ready) {
-      return "It worked";
-    } else {
-      return "Initializing";
+function direction_from_game_key(game_key) {
+  if (game_key instanceof UpKey) {
+    return new Up();
+  } else if (game_key instanceof DownKey) {
+    return new Down();
+  } else if (game_key instanceof LeftKey) {
+    return new Left();
+  } else {
+    return new Right();
+  }
+}
+function setup_listeners() {
+  return from(
+    (dispatch) => {
+      return on_keyboard_event(
+        (game_key) => {
+          let direction = direction_from_game_key(game_key);
+          return dispatch(new PlayerQueueEvent(new MoveCursor(direction)));
+        }
+      );
     }
-  })();
-  return text(text2);
+  );
+}
+function reset_events(game_state) {
+  return game_state.withFields({ event_queue: toList([]) });
+}
+function is_gt_or_eq(order) {
+  if (order instanceof Lt) {
+    return false;
+  } else {
+    return true;
+  }
+}
+function schedule_next_frame() {
+  return from(
+    (dispatch) => {
+      return request_animation_frame(
+        (timestamp) => {
+          return dispatch(new Tick(timestamp));
+        }
+      );
+    }
+  );
+}
+function current_animation_vector(start3, target, t) {
+  let sx = start3[0];
+  let sy = start3[1];
+  let tx = target[0];
+  let ty = target[1];
+  return [
+    (() => {
+      let _pipe = sx;
+      return add2(_pipe, multiply(subtract(tx, sx), t));
+    })(),
+    (() => {
+      let _pipe = sy;
+      return add2(_pipe, multiply(subtract(ty, sy), t));
+    })()
+  ];
+}
+function vector_move(s, d) {
+  let sx = s[0];
+  let sy = s[1];
+  let dx = d[0];
+  let dy = d[1];
+  return [add2(sx, dx), add2(sy, dy)];
+}
+function apply_events(game_state, events) {
+  let _pipe = fold_right(
+    events,
+    game_state,
+    (acc, event) => {
+      {
+        let direction = event.direction;
+        let $ = game_state.cursor_animation;
+        if ($ instanceof CursorIdle) {
+          let new_cursor = (() => {
+            let _pipe2 = direction;
+            let _pipe$1 = direction_to_vector(_pipe2);
+            return vector_move(_pipe$1, acc.cursor);
+          })();
+          return game_state.withFields({
+            cursor: new_cursor,
+            cursor_animation: new CursorMoving(
+              game_state.cursor,
+              new_cursor,
+              0,
+              1
+            )
+          });
+        } else {
+          return acc;
+        }
+      }
+    }
+  );
+  return reset_events(_pipe);
+}
+function render(game_state) {
+  return from(
+    (_) => {
+      return request_animation_frame(
+        (timestamp) => {
+          let $ = with_context();
+          if ($.isOk() && $[0] instanceof RenderContext) {
+            let canvas2 = $[0][0];
+            let context = $[0][1];
+            let $1 = (() => {
+              let $2 = game_state.cursor_animation;
+              if ($2 instanceof CursorIdle) {
+                let elapsed = $2.elapsed;
+                let cycle = $2.cycle;
+                let amplitude = $2.amplitude;
+                let t = (() => {
+                  let _pipe2 = divide(elapsed, cycle);
+                  return unwrap(_pipe2, 0);
+                })();
+                let $3 = game_state.cursor;
+                let sx = $3[0];
+                let sy = $3[1];
+                let offset_y = (() => {
+                  let _pipe2 = t;
+                  let _pipe$12 = multiply(_pipe2, 2);
+                  let _pipe$22 = multiply(_pipe$12, pi2());
+                  let _pipe$3 = sin2(_pipe$22);
+                  let _pipe$4 = multiply(_pipe$3, amplitude);
+                  return add2(_pipe$4, sy);
+                })();
+                return vector_move([sx, offset_y], [2.5, 2.5]);
+              } else {
+                let start3 = $2.start;
+                let target = $2.target;
+                let elapsed = $2.elapsed;
+                let duration = $2.duration;
+                let t = (() => {
+                  let _pipe2 = divide(elapsed, duration);
+                  return unwrap(_pipe2, 0);
+                })();
+                let new_pos = current_animation_vector(start3, target, t);
+                return vector_move(new_pos, [2.5, 2.5]);
+              }
+            })();
+            let cursor_x = $1[0];
+            let cursor_y = $1[1];
+            let _pipe = context;
+            let _pipe$1 = stroke_rect(
+              _pipe,
+              0,
+              0,
+              100,
+              100
+            );
+            let _pipe$2 = set_fill_style(_pipe$1, "#FCE800");
+            fill_rect(_pipe$2, cursor_x, cursor_y, 5, 5);
+            return void 0;
+          } else {
+            throw makeError(
+              "panic",
+              "client",
+              300,
+              "",
+              "`panic` expression evaluated.",
+              {}
+            );
+          }
+        }
+      );
+    }
+  );
+}
+function update_and_schedule(game_state) {
+  return [
+    new Ready(game_state),
+    batch(toList([render(game_state), schedule_next_frame()]))
+  ];
 }
 function init_canvas() {
   return from(
     (dispatch) => {
       return request_animation_frame(
-        (_) => {
+        (timestamp) => {
           let $ = with_context();
           if ($.isOk() && $[0] instanceof RenderContext) {
             let context = $[0][1];
             fill_rect(context, 0, 0, 100, 100);
-            return dispatch(new AppInitCanvas());
+            return dispatch(new AppInitCanvas(timestamp));
           } else {
             return dispatch(new AppSetNoCanvas());
           }
@@ -2028,14 +2454,132 @@ function init_canvas() {
 function init2(_) {
   return [new Idle(), init_canvas()];
 }
-function view(model) {
+function view(_) {
   return div(
     toList([]),
-    toList([
-      h1(toList([]), toList([render(model)])),
-      canvas(toList([id(render_target_id)]))
-    ])
+    toList([canvas(toList([id(render_target_id)]))])
   );
+}
+var cursor_idle_info = /* @__PURE__ */ new CursorIdle(0, 2, 3);
+function run_logic_update(game_state, dt_seconds) {
+  let new_cursor_animation = (() => {
+    let $ = game_state.cursor_animation;
+    if ($ instanceof CursorIdle) {
+      let elapsed = $.elapsed;
+      let cycle = $.cycle;
+      let amplitude = $.amplitude;
+      let looped_elapsed = (() => {
+        let _pipe = elapsed;
+        let _pipe$1 = add2(_pipe, dt_seconds);
+        let _pipe$2 = modulo(_pipe$1, cycle);
+        return unwrap(_pipe$2, 0);
+      })();
+      return new CursorIdle(looped_elapsed, cycle, amplitude);
+    } else {
+      let start3 = $.start;
+      let target = $.target;
+      let elapsed = $.elapsed;
+      let duration = $.duration;
+      let new_elapsed = add2(elapsed, dt_seconds);
+      let $1 = compare(new_elapsed, duration);
+      if ($1 instanceof Lt) {
+        return new CursorMoving(start3, target, new_elapsed, duration);
+      } else {
+        return cursor_idle_info;
+      }
+    }
+  })();
+  return game_state.withFields({ cursor_animation: new_cursor_animation });
+}
+var fixed_dt = 16.67;
+function engine_update_loop(loop$game_state, loop$acc) {
+  while (true) {
+    let game_state = loop$game_state;
+    let acc = loop$acc;
+    let $ = (() => {
+      let _pipe = compare(acc, fixed_dt);
+      return is_gt_or_eq(_pipe);
+    })();
+    if ($) {
+      let dt_seconds = (() => {
+        let _pipe2 = divide(fixed_dt, 1e3);
+        return unwrap(_pipe2, 0);
+      })();
+      let _pipe = game_state;
+      let _pipe$1 = apply_events(_pipe, game_state.event_queue);
+      let _pipe$2 = run_logic_update(_pipe$1, dt_seconds);
+      loop$game_state = _pipe$2;
+      loop$acc = subtract(acc, fixed_dt);
+    } else {
+      return game_state.withFields({ accumulator: 0 });
+    }
+  }
+}
+function engine_update(game_state, current_time) {
+  let frame_time = subtract(current_time, game_state.previous_time);
+  let accumulator = add2(game_state.accumulator, frame_time);
+  let updated_state = game_state.withFields({
+    previous_time: current_time,
+    accumulator
+  });
+  return engine_update_loop(updated_state, accumulator);
+}
+function update(model, msg) {
+  if (msg instanceof AppInitCanvas) {
+    let previous_time = msg[0];
+    return [
+      new Ready(
+        new GameState(
+          previous_time,
+          0,
+          toList([]),
+          [0, 0],
+          cursor_idle_info
+        )
+      ),
+      batch(toList([setup_listeners(), schedule_next_frame()]))
+    ];
+  } else if (msg instanceof AppSetNoCanvas) {
+    return [new NoCanvas(), none()];
+  } else if (msg instanceof Tick) {
+    let current_time = msg[0];
+    if (model instanceof Ready) {
+      let game_state = model.game_state;
+      let _pipe = engine_update(game_state, current_time);
+      return update_and_schedule(_pipe);
+    } else {
+      throw makeError(
+        "panic",
+        "client",
+        99,
+        "update",
+        "`panic` expression evaluated.",
+        {}
+      );
+    }
+  } else {
+    let event = msg[0];
+    if (model instanceof Ready) {
+      let game_state = model.game_state;
+      return [
+        new Ready(
+          game_state.withFields({
+            event_queue: prepend(event, game_state.event_queue)
+          })
+        ),
+        none()
+      ];
+    } else {
+      throw makeError(
+        "panic",
+        "client",
+        113,
+        "update",
+        "`panic` expression evaluated.",
+        {}
+      );
+    }
+  }
 }
 function main() {
   let app = application(init2, update, view);
@@ -2044,7 +2588,7 @@ function main() {
     throw makeError(
       "let_assert",
       "client",
-      16,
+      21,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }

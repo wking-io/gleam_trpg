@@ -103,7 +103,6 @@ export function draw_image_cropped(
 }
 
 export function fill_rect(context, x, y, width, height) {
-  console.log(context);
   context.fillRect(x, y, width, height);
   return context;
 }
@@ -122,4 +121,9 @@ export function measure_text(context, text) {
     ideographic_baseline: metrics.ideographicBaseline || 0,
     width: metrics.width,
   };
+}
+
+export function stroke_rect(context, x, y, width, height) {
+  context.strokeRect(x, y, width, height);
+  return context;
 }
