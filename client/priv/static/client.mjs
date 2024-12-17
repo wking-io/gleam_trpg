@@ -77,95 +77,6 @@ var NonEmpty = class extends List {
     this.tail = tail;
   }
 };
-var BitArray = class _BitArray {
-  constructor(buffer) {
-    if (!(buffer instanceof Uint8Array)) {
-      throw "BitArray can only be constructed from a Uint8Array";
-    }
-    this.buffer = buffer;
-  }
-  // @internal
-  get length() {
-    return this.buffer.length;
-  }
-  // @internal
-  byteAt(index2) {
-    return this.buffer[index2];
-  }
-  // @internal
-  floatFromSlice(start3, end, isBigEndian) {
-    return byteArrayToFloat(this.buffer, start3, end, isBigEndian);
-  }
-  // @internal
-  intFromSlice(start3, end, isBigEndian, isSigned) {
-    return byteArrayToInt(this.buffer, start3, end, isBigEndian, isSigned);
-  }
-  // @internal
-  binaryFromSlice(start3, end) {
-    return new _BitArray(this.buffer.slice(start3, end));
-  }
-  // @internal
-  sliceAfter(index2) {
-    return new _BitArray(this.buffer.slice(index2));
-  }
-};
-var UtfCodepoint = class {
-  constructor(value) {
-    this.value = value;
-  }
-};
-function byteArrayToInt(byteArray, start3, end, isBigEndian, isSigned) {
-  const byteSize = end - start3;
-  if (byteSize <= 6) {
-    let value = 0;
-    if (isBigEndian) {
-      for (let i = start3; i < end; i++) {
-        value = value * 256 + byteArray[i];
-      }
-    } else {
-      for (let i = end - 1; i >= start3; i--) {
-        value = value * 256 + byteArray[i];
-      }
-    }
-    if (isSigned) {
-      const highBit = 2 ** (byteSize * 8 - 1);
-      if (value >= highBit) {
-        value -= highBit * 2;
-      }
-    }
-    return value;
-  } else {
-    let value = 0n;
-    if (isBigEndian) {
-      for (let i = start3; i < end; i++) {
-        value = (value << 8n) + BigInt(byteArray[i]);
-      }
-    } else {
-      for (let i = end - 1; i >= start3; i--) {
-        value = (value << 8n) + BigInt(byteArray[i]);
-      }
-    }
-    if (isSigned) {
-      const highBit = 1n << BigInt(byteSize * 8 - 1);
-      if (value >= highBit) {
-        value -= highBit * 2n;
-      }
-    }
-    return Number(value);
-  }
-}
-function byteArrayToFloat(byteArray, start3, end, isBigEndian) {
-  const view2 = new DataView(byteArray.buffer);
-  const byteSize = end - start3;
-  if (byteSize === 8) {
-    return view2.getFloat64(start3, !isBigEndian);
-  } else if (byteSize === 4) {
-    return view2.getFloat32(start3, !isBigEndian);
-  } else {
-    const msg = `Sized floats must be 32-bit or 64-bit on JavaScript, got size of ${byteSize * 8} bits`;
-    throw new globalThis.Error(msg);
-  }
-}
 var Result = class _Result extends CustomType {
   // @internal
   static isResult(data) {
@@ -427,10 +338,6 @@ function drop_start(loop$string, loop$num_graphemes) {
       }
     }
   }
-}
-function inspect2(term) {
-  let _pipe = inspect(term);
-  return identity(_pipe);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/result.mjs
@@ -1166,19 +1073,6 @@ function identity(x) {
 function to_string(term) {
   return term.toString();
 }
-function float_to_string(float2) {
-  const string2 = float2.toString().replace("+", "");
-  if (string2.indexOf(".") >= 0) {
-    return string2;
-  } else {
-    const index2 = string2.indexOf("e");
-    if (index2 >= 0) {
-      return string2.slice(0, index2) + ".0" + string2.slice(index2);
-    } else {
-      return string2 + ".0";
-    }
-  }
-}
 var segmenter = void 0;
 function graphemes_iterator(string2) {
   if (globalThis.Intl && Intl.Segmenter) {
@@ -1222,15 +1116,6 @@ var unicode_whitespaces = [
 ].join("");
 var trim_start_regex = new RegExp(`^[${unicode_whitespaces}]*`);
 var trim_end_regex = new RegExp(`[${unicode_whitespaces}]*$`);
-function print_debug(string2) {
-  if (typeof process === "object" && process.stderr?.write) {
-    process.stderr.write(string2 + "\n");
-  } else if (typeof Deno === "object") {
-    Deno.stderr.writeSync(new TextEncoder().encode(string2 + "\n"));
-  } else {
-    console.log(string2);
-  }
-}
 function floor(float2) {
   return Math.floor(float2);
 }
@@ -1242,119 +1127,6 @@ function map_to_list(map4) {
 }
 function map_insert(key, value, map4) {
   return map4.set(key, value);
-}
-function inspect(v) {
-  const t = typeof v;
-  if (v === true)
-    return "True";
-  if (v === false)
-    return "False";
-  if (v === null)
-    return "//js(null)";
-  if (v === void 0)
-    return "Nil";
-  if (t === "string")
-    return inspectString(v);
-  if (t === "bigint" || Number.isInteger(v))
-    return v.toString();
-  if (t === "number")
-    return float_to_string(v);
-  if (Array.isArray(v))
-    return `#(${v.map(inspect).join(", ")})`;
-  if (v instanceof List)
-    return inspectList(v);
-  if (v instanceof UtfCodepoint)
-    return inspectUtfCodepoint(v);
-  if (v instanceof BitArray)
-    return inspectBitArray(v);
-  if (v instanceof CustomType)
-    return inspectCustomType(v);
-  if (v instanceof Dict)
-    return inspectDict(v);
-  if (v instanceof Set)
-    return `//js(Set(${[...v].map(inspect).join(", ")}))`;
-  if (v instanceof RegExp)
-    return `//js(${v})`;
-  if (v instanceof Date)
-    return `//js(Date("${v.toISOString()}"))`;
-  if (v instanceof Function) {
-    const args = [];
-    for (const i of Array(v.length).keys())
-      args.push(String.fromCharCode(i + 97));
-    return `//fn(${args.join(", ")}) { ... }`;
-  }
-  return inspectObject(v);
-}
-function inspectString(str) {
-  let new_str = '"';
-  for (let i = 0; i < str.length; i++) {
-    let char = str[i];
-    switch (char) {
-      case "\n":
-        new_str += "\\n";
-        break;
-      case "\r":
-        new_str += "\\r";
-        break;
-      case "	":
-        new_str += "\\t";
-        break;
-      case "\f":
-        new_str += "\\f";
-        break;
-      case "\\":
-        new_str += "\\\\";
-        break;
-      case '"':
-        new_str += '\\"';
-        break;
-      default:
-        if (char < " " || char > "~" && char < "\xA0") {
-          new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
-        } else {
-          new_str += char;
-        }
-    }
-  }
-  new_str += '"';
-  return new_str;
-}
-function inspectDict(map4) {
-  let body = "dict.from_list([";
-  let first2 = true;
-  map4.forEach((value, key) => {
-    if (!first2)
-      body = body + ", ";
-    body = body + "#(" + inspect(key) + ", " + inspect(value) + ")";
-    first2 = false;
-  });
-  return body + "])";
-}
-function inspectObject(v) {
-  const name = Object.getPrototypeOf(v)?.constructor?.name || "Object";
-  const props = [];
-  for (const k of Object.keys(v)) {
-    props.push(`${inspect(k)}: ${inspect(v[k])}`);
-  }
-  const body = props.length ? " " + props.join(", ") + " " : "";
-  const head = name === "Object" ? "" : name + " ";
-  return `//js(${head}{${body}})`;
-}
-function inspectCustomType(record) {
-  const props = Object.keys(record).map((label) => {
-    const value = inspect(record[label]);
-    return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
-  }).join(", ");
-  return props ? `${record.constructor.name}(${props})` : record.constructor.name;
-}
-function inspectList(list) {
-  return `[${list.toArray().map(inspect).join(", ")}]`;
-}
-function inspectBitArray(bits) {
-  return `<<${Array.from(bits.buffer).join(", ")}>>`;
-}
-function inspectUtfCodepoint(codepoint2) {
-  return `//utfcodepoint(${String.fromCodePoint(codepoint2.value)})`;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/float.mjs
@@ -1410,14 +1182,6 @@ function sin2(x) {
 }
 function pi2() {
   return pi();
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/io.mjs
-function debug(term) {
-  let _pipe = term;
-  let _pipe$1 = inspect2(_pipe);
-  print_debug(_pipe$1);
-  return term;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/bool.mjs
@@ -2426,13 +2190,14 @@ var Ready = class extends CustomType {
   }
 };
 var GameState = class extends CustomType {
-  constructor(previous_time, accumulator, event_queue, cursor, cursor_animation) {
+  constructor(previous_time, accumulator, event_queue, cursor, cursor_animation, fps) {
     super();
     this.previous_time = previous_time;
     this.accumulator = accumulator;
     this.event_queue = event_queue;
     this.cursor = cursor;
     this.cursor_animation = cursor_animation;
+    this.fps = fps;
   }
 };
 var CursorIdle = class extends CustomType {
@@ -2564,39 +2329,12 @@ function vector_move(s, d) {
   let dy = d[1];
   return [add2(sx, dx), add2(sy, dy)];
 }
-function apply_events(game_state, events) {
-  let _pipe = fold_right(
-    events,
-    game_state,
-    (acc, event) => {
-      {
-        let direction = event.direction;
-        let $ = game_state.cursor_animation;
-        if ($ instanceof CursorIdle) {
-          let new_cursor = (() => {
-            let _pipe2 = direction;
-            let _pipe$1 = direction_to_vector(_pipe2);
-            return vector_move(_pipe$1, acc.cursor);
-          })();
-          return game_state.withFields({
-            cursor: new_cursor,
-            cursor_animation: new CursorMoving(
-              game_state.cursor,
-              new_cursor,
-              0,
-              1
-            )
-          });
-        } else {
-          return acc;
-        }
-      }
-    }
-  );
-  return reset_events(_pipe);
+function vector_scale(v, scale) {
+  let x = v[0];
+  let y = v[1];
+  return [multiply(x, scale), multiply(y, scale)];
 }
 function render(game_state) {
-  debug(game_state.cursor_animation);
   return from(
     (_) => {
       return request_animation_frame(
@@ -2615,7 +2353,10 @@ function render(game_state) {
                   let _pipe2 = divide(elapsed, cycle);
                   return unwrap(_pipe2, 0);
                 })();
-                let $3 = game_state.cursor;
+                let $3 = (() => {
+                  let _pipe2 = game_state.cursor;
+                  return vector_scale(_pipe2, 10);
+                })();
                 let sx = $3[0];
                 let sy = $3[1];
                 let offset_y = (() => {
@@ -2626,18 +2367,20 @@ function render(game_state) {
                   let _pipe$4 = multiply(_pipe$32, amplitude);
                   return add2(_pipe$4, sy);
                 })();
-                return vector_move([sx, offset_y], [2.5, 2.5]);
+                return vector_move([sx, offset_y], [25, 25]);
               } else {
                 let start3 = $2.start;
                 let target = $2.target;
                 let elapsed = $2.elapsed;
                 let duration = $2.duration;
                 let t = (() => {
-                  let _pipe2 = divide(elapsed, duration);
-                  return unwrap(_pipe2, 0);
+                  let _pipe3 = divide(elapsed, duration);
+                  return unwrap(_pipe3, 0);
                 })();
-                let new_pos = current_animation_vector(start3, target, t);
-                return vector_move(new_pos, [2.5, 2.5]);
+                let _pipe2 = start3;
+                let _pipe$12 = current_animation_vector(_pipe2, target, t);
+                let _pipe$22 = vector_scale(_pipe$12, 10);
+                return vector_move(_pipe$22, [25, 25]);
               }
             })();
             let cursor_x = $1[0];
@@ -2647,24 +2390,24 @@ function render(game_state) {
               _pipe,
               0,
               0,
-              100,
-              100
+              1e3,
+              1e3
             );
             let _pipe$2 = stroke_rect(
               _pipe$1,
               0,
               0,
-              100,
-              100
+              1e3,
+              1e3
             );
             let _pipe$3 = set_fill_style(_pipe$2, "#FA470A");
-            fill_rect(_pipe$3, cursor_x, cursor_y, 5, 5);
+            fill_rect(_pipe$3, cursor_x, cursor_y, 50, 50);
             return void 0;
           } else {
             throw makeError(
               "panic",
               "client",
-              303,
+              321,
               "",
               "`panic` expression evaluated.",
               {}
@@ -2689,7 +2432,7 @@ function init_canvas() {
           let $ = with_context();
           if ($.isOk() && $[0] instanceof RenderContext) {
             let context = $[0][1];
-            fill_rect(context, 0, 0, 100, 100);
+            fill_rect(context, 0, 0, 1e3, 1e3);
             return dispatch(new AppInitCanvas(timestamp));
           } else {
             return dispatch(new AppSetNoCanvas());
@@ -2708,7 +2451,41 @@ function view(_) {
     toList([canvas(toList([id(render_target_id)]))])
   );
 }
-var cursor_idle_info = /* @__PURE__ */ new CursorIdle(0, 2, 1);
+function frames(count) {
+  return multiply(0.01667, count);
+}
+function apply_events(game_state, events) {
+  let _pipe = fold_right(
+    events,
+    game_state,
+    (acc, event) => {
+      {
+        let direction = event.direction;
+        let $ = game_state.cursor_animation;
+        if ($ instanceof CursorIdle) {
+          let new_cursor = (() => {
+            let _pipe2 = direction;
+            let _pipe$1 = direction_to_vector(_pipe2);
+            return vector_move(_pipe$1, acc.cursor);
+          })();
+          return game_state.withFields({
+            cursor: new_cursor,
+            cursor_animation: new CursorMoving(
+              game_state.cursor,
+              new_cursor,
+              0,
+              frames(6)
+            )
+          });
+        } else {
+          return acc;
+        }
+      }
+    }
+  );
+  return reset_events(_pipe);
+}
+var cursor_idle_info = /* @__PURE__ */ new CursorIdle(0, 0.75, 1);
 function run_logic_update(game_state, dt_seconds) {
   let new_cursor_animation = (() => {
     let $ = game_state.cursor_animation;
@@ -2766,9 +2543,19 @@ function engine_update_loop(loop$game_state, loop$acc) {
 function engine_update(game_state, current_time) {
   let frame_time = subtract(current_time, game_state.previous_time);
   let accumulator = add2(game_state.accumulator, frame_time);
+  let fps = (() => {
+    let $ = divide(1e3, frame_time);
+    if ($.isOk()) {
+      let fps2 = $[0];
+      return fps2;
+    } else {
+      return 0;
+    }
+  })();
   let updated_state = game_state.withFields({
     previous_time: current_time,
-    accumulator
+    accumulator,
+    fps
   });
   return engine_update_loop(updated_state, accumulator);
 }
@@ -2782,7 +2569,8 @@ function update(model, msg) {
           0,
           toList([]),
           [0, 0],
-          cursor_idle_info
+          cursor_idle_info,
+          0
         )
       ),
       batch(toList([setup_listeners(), schedule_next_frame()]))
@@ -2799,7 +2587,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        100,
+        108,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -2821,7 +2609,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        114,
+        122,
         "update",
         "`panic` expression evaluated.",
         {}

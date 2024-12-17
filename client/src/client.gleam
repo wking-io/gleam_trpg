@@ -39,6 +39,7 @@ type GameState {
     event_queue: List(Event),
     cursor: Vector,
     cursor_animation: CursorAnimation,
+    fps: Float,
   )
 }
 
@@ -83,12 +84,19 @@ type Event {
   MoveCursor(direction: Direction)
 }
 
-const cursor_idle_info = CursorIdle(0.0, 2.0, 1.0)
+const cursor_idle_info = CursorIdle(0.0, 0.75, 1.0)
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
     AppInitCanvas(previous_time) -> #(
-      Ready(GameState(previous_time, 0.0, [], #(0.0, 0.0), cursor_idle_info)),
+      Ready(GameState(
+        previous_time,
+        0.0,
+        [],
+        #(0.0, 0.0),
+        cursor_idle_info,
+        0.0,
+      )),
       effect.batch([setup_listeners(), schedule_next_frame()]),
     )
     AppSetNoCanvas -> #(NoCanvas, effect.none())
@@ -147,11 +155,19 @@ const fixed_dt = 16.67
 fn engine_update(game_state: GameState, current_time: Float) -> GameState {
   let frame_time = float.subtract(current_time, game_state.previous_time)
   let accumulator = float.add(game_state.accumulator, frame_time)
+
+  // Avoid division by zero
+  let fps = case float.divide(1000.0, frame_time) {
+    Ok(fps) -> fps
+    _ -> 0.0
+  }
+
   let updated_state =
     GameState(
       ..game_state,
       previous_time: current_time,
       accumulator: accumulator,
+      fps: fps,
     )
   engine_update_loop(updated_state, accumulator)
 }
@@ -186,7 +202,7 @@ fn apply_events(game_state: GameState, events: List(Event)) -> GameState {
                 start: game_state.cursor,
                 target: new_cursor,
                 elapsed: 0.0,
-                duration: 1.0,
+                duration: frames(6.0),
               ),
             )
           }
@@ -246,7 +262,7 @@ fn init_canvas() {
     engine.request_animation_frame(fn(timestamp) {
       case render.with_context() {
         Ok(render.RenderContext(_canvas, context)) -> {
-          context_impl.fill_rect(context, 0.0, 0.0, 100.0, 100.0)
+          context_impl.fill_rect(context, 0.0, 0.0, 1000.0, 1000.0)
           dispatch(AppInitCanvas(timestamp))
         }
         _ -> dispatch(AppSetNoCanvas)
@@ -268,7 +284,6 @@ fn view(_model: Model) -> Element(Msg) {
 }
 
 fn render(game_state: GameState) -> Effect(Msg) {
-  io.debug(game_state.cursor_animation)
   effect.from(fn(_dispatch) {
     engine.request_animation_frame(fn(timestamp) {
       case render.with_context() {
@@ -276,7 +291,7 @@ fn render(game_state: GameState) -> Effect(Msg) {
           let #(cursor_x, cursor_y) = case game_state.cursor_animation {
             CursorIdle(elapsed, cycle, amplitude) -> {
               let t = float.divide(elapsed, cycle) |> result.unwrap(0.0)
-              let #(sx, sy) = game_state.cursor
+              let #(sx, sy) = game_state.cursor |> vector_scale(10.0)
               let offset_y =
                 t
                 |> float.multiply(2.0)
@@ -284,20 +299,23 @@ fn render(game_state: GameState) -> Effect(Msg) {
                 |> elementary.sin
                 |> float.multiply(amplitude)
                 |> float.add(sy)
-              vector_move(#(sx, offset_y), #(2.5, 2.5))
+              vector_move(#(sx, offset_y), #(25.0, 25.0))
             }
             CursorMoving(start, target, elapsed, duration) -> {
               let t = float.divide(elapsed, duration) |> result.unwrap(0.0)
-              let new_pos = current_animation_vector(start, target, t)
-              vector_move(new_pos, #(2.5, 2.5))
+
+              start
+              |> current_animation_vector(target, t)
+              |> vector_scale(10.0)
+              |> vector_move(#(25.0, 25.0))
             }
           }
 
           context
-          |> context_impl.clear_rect(0.0, 0.0, 100.0, 100.0)
-          |> context_impl.stroke_rect(0.0, 0.0, 100.0, 100.0)
+          |> context_impl.clear_rect(0.0, 0.0, 1000.0, 1000.0)
+          |> context_impl.stroke_rect(0.0, 0.0, 1000.0, 1000.0)
           |> context_impl.set_fill_style("#FA470A")
-          |> context_impl.fill_rect(cursor_x, cursor_y, 5.0, 5.0)
+          |> context_impl.fill_rect(cursor_x, cursor_y, 50.0, 50.0)
           Nil
         }
         _ -> panic
@@ -319,4 +337,13 @@ fn vector_move(s: Vector, d: Vector) -> Vector {
   let #(sx, sy) = s
   let #(dx, dy) = d
   #(float.add(sx, dx), float.add(sy, dy))
+}
+
+fn vector_scale(v: Vector, scale: Float) -> Vector {
+  let #(x, y) = v
+  #(float.multiply(x, scale), float.multiply(y, scale))
+}
+
+fn frames(count: Float) {
+  float.multiply(0.01667, count)
 }
