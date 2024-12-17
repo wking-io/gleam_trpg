@@ -77,6 +77,95 @@ var NonEmpty = class extends List {
     this.tail = tail;
   }
 };
+var BitArray = class _BitArray {
+  constructor(buffer) {
+    if (!(buffer instanceof Uint8Array)) {
+      throw "BitArray can only be constructed from a Uint8Array";
+    }
+    this.buffer = buffer;
+  }
+  // @internal
+  get length() {
+    return this.buffer.length;
+  }
+  // @internal
+  byteAt(index2) {
+    return this.buffer[index2];
+  }
+  // @internal
+  floatFromSlice(start3, end, isBigEndian) {
+    return byteArrayToFloat(this.buffer, start3, end, isBigEndian);
+  }
+  // @internal
+  intFromSlice(start3, end, isBigEndian, isSigned) {
+    return byteArrayToInt(this.buffer, start3, end, isBigEndian, isSigned);
+  }
+  // @internal
+  binaryFromSlice(start3, end) {
+    return new _BitArray(this.buffer.slice(start3, end));
+  }
+  // @internal
+  sliceAfter(index2) {
+    return new _BitArray(this.buffer.slice(index2));
+  }
+};
+var UtfCodepoint = class {
+  constructor(value) {
+    this.value = value;
+  }
+};
+function byteArrayToInt(byteArray, start3, end, isBigEndian, isSigned) {
+  const byteSize = end - start3;
+  if (byteSize <= 6) {
+    let value = 0;
+    if (isBigEndian) {
+      for (let i = start3; i < end; i++) {
+        value = value * 256 + byteArray[i];
+      }
+    } else {
+      for (let i = end - 1; i >= start3; i--) {
+        value = value * 256 + byteArray[i];
+      }
+    }
+    if (isSigned) {
+      const highBit = 2 ** (byteSize * 8 - 1);
+      if (value >= highBit) {
+        value -= highBit * 2;
+      }
+    }
+    return value;
+  } else {
+    let value = 0n;
+    if (isBigEndian) {
+      for (let i = start3; i < end; i++) {
+        value = (value << 8n) + BigInt(byteArray[i]);
+      }
+    } else {
+      for (let i = end - 1; i >= start3; i--) {
+        value = (value << 8n) + BigInt(byteArray[i]);
+      }
+    }
+    if (isSigned) {
+      const highBit = 1n << BigInt(byteSize * 8 - 1);
+      if (value >= highBit) {
+        value -= highBit * 2n;
+      }
+    }
+    return Number(value);
+  }
+}
+function byteArrayToFloat(byteArray, start3, end, isBigEndian) {
+  const view2 = new DataView(byteArray.buffer);
+  const byteSize = end - start3;
+  if (byteSize === 8) {
+    return view2.getFloat64(start3, !isBigEndian);
+  } else if (byteSize === 4) {
+    return view2.getFloat32(start3, !isBigEndian);
+  } else {
+    const msg = `Sized floats must be 32-bit or 64-bit on JavaScript, got size of ${byteSize * 8} bits`;
+    throw new globalThis.Error(msg);
+  }
+}
 var Result = class _Result extends CustomType {
   // @internal
   static isResult(data) {
@@ -338,6 +427,10 @@ function drop_start(loop$string, loop$num_graphemes) {
       }
     }
   }
+}
+function inspect2(term) {
+  let _pipe = inspect(term);
+  return identity(_pipe);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/result.mjs
@@ -1073,6 +1166,19 @@ function identity(x) {
 function to_string(term) {
   return term.toString();
 }
+function float_to_string(float2) {
+  const string2 = float2.toString().replace("+", "");
+  if (string2.indexOf(".") >= 0) {
+    return string2;
+  } else {
+    const index2 = string2.indexOf("e");
+    if (index2 >= 0) {
+      return string2.slice(0, index2) + ".0" + string2.slice(index2);
+    } else {
+      return string2 + ".0";
+    }
+  }
+}
 var segmenter = void 0;
 function graphemes_iterator(string2) {
   if (globalThis.Intl && Intl.Segmenter) {
@@ -1116,6 +1222,15 @@ var unicode_whitespaces = [
 ].join("");
 var trim_start_regex = new RegExp(`^[${unicode_whitespaces}]*`);
 var trim_end_regex = new RegExp(`[${unicode_whitespaces}]*$`);
+function print_debug(string2) {
+  if (typeof process === "object" && process.stderr?.write) {
+    process.stderr.write(string2 + "\n");
+  } else if (typeof Deno === "object") {
+    Deno.stderr.writeSync(new TextEncoder().encode(string2 + "\n"));
+  } else {
+    console.log(string2);
+  }
+}
 function floor(float2) {
   return Math.floor(float2);
 }
@@ -1127,6 +1242,119 @@ function map_to_list(map4) {
 }
 function map_insert(key, value, map4) {
   return map4.set(key, value);
+}
+function inspect(v) {
+  const t = typeof v;
+  if (v === true)
+    return "True";
+  if (v === false)
+    return "False";
+  if (v === null)
+    return "//js(null)";
+  if (v === void 0)
+    return "Nil";
+  if (t === "string")
+    return inspectString(v);
+  if (t === "bigint" || Number.isInteger(v))
+    return v.toString();
+  if (t === "number")
+    return float_to_string(v);
+  if (Array.isArray(v))
+    return `#(${v.map(inspect).join(", ")})`;
+  if (v instanceof List)
+    return inspectList(v);
+  if (v instanceof UtfCodepoint)
+    return inspectUtfCodepoint(v);
+  if (v instanceof BitArray)
+    return inspectBitArray(v);
+  if (v instanceof CustomType)
+    return inspectCustomType(v);
+  if (v instanceof Dict)
+    return inspectDict(v);
+  if (v instanceof Set)
+    return `//js(Set(${[...v].map(inspect).join(", ")}))`;
+  if (v instanceof RegExp)
+    return `//js(${v})`;
+  if (v instanceof Date)
+    return `//js(Date("${v.toISOString()}"))`;
+  if (v instanceof Function) {
+    const args = [];
+    for (const i of Array(v.length).keys())
+      args.push(String.fromCharCode(i + 97));
+    return `//fn(${args.join(", ")}) { ... }`;
+  }
+  return inspectObject(v);
+}
+function inspectString(str) {
+  let new_str = '"';
+  for (let i = 0; i < str.length; i++) {
+    let char = str[i];
+    switch (char) {
+      case "\n":
+        new_str += "\\n";
+        break;
+      case "\r":
+        new_str += "\\r";
+        break;
+      case "	":
+        new_str += "\\t";
+        break;
+      case "\f":
+        new_str += "\\f";
+        break;
+      case "\\":
+        new_str += "\\\\";
+        break;
+      case '"':
+        new_str += '\\"';
+        break;
+      default:
+        if (char < " " || char > "~" && char < "\xA0") {
+          new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
+        } else {
+          new_str += char;
+        }
+    }
+  }
+  new_str += '"';
+  return new_str;
+}
+function inspectDict(map4) {
+  let body = "dict.from_list([";
+  let first2 = true;
+  map4.forEach((value, key) => {
+    if (!first2)
+      body = body + ", ";
+    body = body + "#(" + inspect(key) + ", " + inspect(value) + ")";
+    first2 = false;
+  });
+  return body + "])";
+}
+function inspectObject(v) {
+  const name = Object.getPrototypeOf(v)?.constructor?.name || "Object";
+  const props = [];
+  for (const k of Object.keys(v)) {
+    props.push(`${inspect(k)}: ${inspect(v[k])}`);
+  }
+  const body = props.length ? " " + props.join(", ") + " " : "";
+  const head = name === "Object" ? "" : name + " ";
+  return `//js(${head}{${body}})`;
+}
+function inspectCustomType(record) {
+  const props = Object.keys(record).map((label) => {
+    const value = inspect(record[label]);
+    return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
+  }).join(", ");
+  return props ? `${record.constructor.name}(${props})` : record.constructor.name;
+}
+function inspectList(list) {
+  return `[${list.toArray().map(inspect).join(", ")}]`;
+}
+function inspectBitArray(bits) {
+  return `<<${Array.from(bits.buffer).join(", ")}>>`;
+}
+function inspectUtfCodepoint(codepoint2) {
+  return `//utfcodepoint(${String.fromCodePoint(codepoint2.value)})`;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/float.mjs
@@ -1182,6 +1410,14 @@ function sin2(x) {
 }
 function pi2() {
   return pi();
+}
+
+// build/dev/javascript/gleam_stdlib/gleam/io.mjs
+function debug(term) {
+  let _pipe = term;
+  let _pipe$1 = inspect2(_pipe);
+  print_debug(_pipe$1);
+  return term;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/bool.mjs
@@ -2360,6 +2596,7 @@ function apply_events(game_state, events) {
   return reset_events(_pipe);
 }
 function render(game_state) {
+  debug(game_state.cursor_animation);
   return from(
     (_) => {
       return request_animation_frame(
@@ -2427,7 +2664,7 @@ function render(game_state) {
             throw makeError(
               "panic",
               "client",
-              301,
+              303,
               "",
               "`panic` expression evaluated.",
               {}
@@ -2562,7 +2799,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        99,
+        100,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -2584,7 +2821,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        113,
+        114,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -2599,7 +2836,7 @@ function main() {
     throw makeError(
       "let_assert",
       "client",
-      21,
+      22,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }

@@ -1,6 +1,7 @@
 // IMPORTS ---------------------------------------------------------------------
 
 import gleam/float
+import gleam/io
 import gleam/list
 import gleam/order.{type Order}
 import gleam/result
@@ -267,6 +268,7 @@ fn view(_model: Model) -> Element(Msg) {
 }
 
 fn render(game_state: GameState) -> Effect(Msg) {
+  io.debug(game_state.cursor_animation)
   effect.from(fn(_dispatch) {
     engine.request_animation_frame(fn(timestamp) {
       case render.with_context() {
