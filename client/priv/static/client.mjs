@@ -2945,7 +2945,7 @@ function render2(game_state) {
             throw makeError(
               "panic",
               "client",
-              298,
+              296,
               "",
               "`panic` expression evaluated.",
               {}
@@ -3044,7 +3044,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        77,
+        75,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -3066,7 +3066,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        91,
+        89,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -3081,7 +3081,7 @@ function main() {
     throw makeError(
       "let_assert",
       "client",
-      35,
+      33,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }

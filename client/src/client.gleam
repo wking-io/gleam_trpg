@@ -1,13 +1,11 @@
 // IMPORTS ---------------------------------------------------------------------
 
 import gleam/float
-import gleam/int
 import gleam/list
 import gleam/order.{type Order}
 import gleam/pair
 import gleam/result
 import lib/camera
-import lib/canvas
 import lib/canvas/context as context_impl
 import lib/coord
 import lib/cursor
