@@ -25,19 +25,20 @@ pub fn get_sprite_key(variant: DemoVariant) {
 }
 
 const sprites = [
-  #("Base", sprite.SpriteRegion(0, 0)), #("Variant1", sprite.SpriteRegion(0, 0)),
-  #("Variant2", sprite.SpriteRegion(0, 1)),
-  #("Variant3", sprite.SpriteRegion(0, 2)),
-  #("Variant4", sprite.SpriteRegion(0, 3)),
-  #("Variant5", sprite.SpriteRegion(0, 4)),
-  #("Variant6", sprite.SpriteRegion(0, 5)),
+  #("Base", sprite.SpriteRegion(0, 0)), #("Variant1", sprite.SpriteRegion(1, 0)),
+  #("Variant2", sprite.SpriteRegion(2, 0)),
+  #("Variant3", sprite.SpriteRegion(3, 0)),
+  #("Variant4", sprite.SpriteRegion(4, 0)),
+  #("Variant5", sprite.SpriteRegion(5, 0)),
+  #("Variant6", sprite.SpriteRegion(6, 0)),
 ]
 
 pub fn sprite_sheet() -> sprite.SpriteSheet {
   sprite.SpriteSheet(
     asset: asset.load_image(
-      "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/test-tile.png",
+      "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/test-tiles.png",
     ),
+    grid: 32,
     sprites: dict.from_list(sprites),
   )
 }

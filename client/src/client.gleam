@@ -2,12 +2,12 @@
 
 import gleam/float
 import gleam/int
-import gleam/io
 import gleam/list
 import gleam/order.{type Order}
+import gleam/pair
 import gleam/result
-import gleam_community/maths/elementary
-import lib/canvas as canvas_impl
+import lib/camera
+import lib/canvas
 import lib/canvas/context as context_impl
 import lib/coord
 import lib/cursor
@@ -246,22 +246,34 @@ fn schedule_next_frame() {
 
 // VIEW ------------------------------------------------------------------------
 
-fn view(_model: Model) -> Element(Msg) {
-  html.div([], [html.canvas([attribute.id(render.render_target_id)])])
-}
-
-fn scale_to_screen(from: Int) {
-  from * 32 |> int.to_float()
+fn view(model: Model) -> Element(Msg) {
+  html.div([], [
+    html.canvas([
+      attribute.id(render.render_target_id),
+      attribute.width(640),
+      attribute.height(360),
+      attribute.style([
+        #("image-rendering", "pixelated"),
+        #("border", "1px solid black"),
+      ]),
+    ]),
+  ])
 }
 
 fn render(game_state: engine.GameState) -> Effect(Msg) {
   effect.from(fn(_dispatch) {
     engine.request_animation_frame(fn(_timestamp) {
       case render.with_context() {
-        Ok(render.RenderContext(canvas, context)) -> {
-          canvas
-          |> canvas_impl.set_width(game_state.map.width)
-          |> canvas_impl.set_height(game_state.map.height)
+        Ok(render.RenderContext(_canvas, context)) -> {
+          let viewport =
+            camera.get_viewport(game_state.camera, game_state.scale)
+          context_impl.clear_rect(
+            context,
+            0.0,
+            0.0,
+            pair.first(viewport),
+            pair.second(viewport),
+          )
 
           game_state.map
           |> map.each_tile(fn(coords, tile) {
@@ -271,61 +283,17 @@ fn render(game_state: engine.GameState) -> Effect(Msg) {
 
             case sprite_region {
               Ok(region) -> {
-                context_impl.draw_image_cropped(
+                sprite.render(
                   context,
-                  game_state.map.sprite_sheet.asset,
-                  sprite.x(region) |> scale_to_screen(),
-                  sprite.y(region) |> scale_to_screen(),
-                  32.0,
-                  32.0,
-                  coord.x(coords) |> scale_to_screen(),
-                  coord.y(coords) |> scale_to_screen(),
-                  32.0,
-                  32.0,
+                  game_state.map.sprite_sheet,
+                  region,
+                  coord.to_vector(coords),
+                  game_state.scale,
                 )
               }
               _ -> context
             }
           })
-
-          let new_cursor = case game_state.cursor_animation {
-            cursor.CursorIdle(elapsed, cycle, amplitude) -> {
-              let t = float.divide(elapsed, cycle) |> result.unwrap(0.0)
-              let start = game_state.cursor |> vector.scale(10.0)
-              let offset_y =
-                t
-                |> float.multiply(2.0)
-                |> float.multiply(elementary.pi())
-                |> elementary.sin
-                |> float.multiply(amplitude)
-                |> float.add(vector.y(start))
-
-              vector.move(
-                vector.at(vector.x(start), offset_y),
-                vector.at(25.0, 25.0),
-              )
-            }
-            cursor.CursorMoving(start, target, elapsed, duration) -> {
-              let t = float.divide(elapsed, duration) |> result.unwrap(0.0)
-
-              start
-              |> vector.interpolate(target, t)
-              |> vector.scale(10.0)
-              |> vector.move(vector.at(25.0, 25.0))
-            }
-          }
-
-          context
-          |> context_impl.clear_rect(0.0, 0.0, 1000.0, 1000.0)
-          |> context_impl.stroke_rect(0.0, 0.0, 1000.0, 1000.0)
-          |> context_impl.set_fill_style("#FA470A")
-          |> context_impl.fill_rect(
-            vector.x(new_cursor),
-            vector.y(new_cursor),
-            50.0,
-            50.0,
-          )
-          Nil
         }
         _ -> panic
       }

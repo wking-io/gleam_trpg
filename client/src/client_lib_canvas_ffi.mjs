@@ -37,6 +37,7 @@ export function get_context_2d(canvas) {
   if (!context) {
     return new Error("Failed to get 2D context");
   }
+  context.imageSmoothingEnabled = false;
   return new Ok(context);
 }
 

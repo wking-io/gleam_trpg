@@ -103,8 +103,8 @@ var Error = class extends Result {
     return false;
   }
 };
-function isEqual(x4, y4) {
-  let values = [x4, y4];
+function isEqual(x3, y3) {
+  let values = [x3, y3];
   while (values.length) {
     let a = values.pop();
     let b = values.pop();
@@ -134,10 +134,10 @@ function isEqual(x4, y4) {
 }
 function getters(object3) {
   if (object3 instanceof Map) {
-    return [(x4) => x4.keys(), (x4, y4) => x4.get(y4)];
+    return [(x3) => x3.keys(), (x3, y3) => x3.get(y3)];
   } else {
     let extra = object3 instanceof globalThis.Error ? ["message"] : [];
-    return [(x4) => [...extra, ...Object.keys(x4)], (x4, y4) => x4[y4]];
+    return [(x3) => [...extra, ...Object.keys(x3)], (x3, y3) => x3[y3]];
   }
 }
 function unequalDates(a, b) {
@@ -168,6 +168,9 @@ function structurallyCompatibleObjects(a, b) {
   if (nonstructural.some((c) => a instanceof c))
     return false;
   return a.constructor === b.constructor;
+}
+function divideInt(a, b) {
+  return Math.trunc(divideFloat(a, b));
 }
 function divideFloat(a, b) {
   if (b === 0) {
@@ -200,6 +203,38 @@ var Gt = class extends CustomType {
 var None = class extends CustomType {
 };
 
+// build/dev/javascript/gleam_stdlib/gleam/int.mjs
+function min(a, b) {
+  let $ = a < b;
+  if ($) {
+    return a;
+  } else {
+    return b;
+  }
+}
+function max(a, b) {
+  let $ = a > b;
+  if ($) {
+    return a;
+  } else {
+    return b;
+  }
+}
+function clamp(x3, min_bound, max_bound) {
+  let _pipe = x3;
+  let _pipe$1 = min(_pipe, max_bound);
+  return max(_pipe$1, min_bound);
+}
+function add(a, b) {
+  return a + b;
+}
+function multiply(a, b) {
+  return a * b;
+}
+function subtract(a, b) {
+  return a - b;
+}
+
 // build/dev/javascript/gleam_stdlib/gleam/dict.mjs
 function insert(dict, key, value) {
   return map_insert(key, value, dict);
@@ -211,10 +246,10 @@ function from_list_loop(loop$list, loop$initial) {
     if (list.hasLength(0)) {
       return initial;
     } else {
-      let x4 = list.head;
+      let x3 = list.head;
       let rest = list.tail;
       loop$list = rest;
-      loop$initial = insert(initial, x4[0], x4[1]);
+      loop$initial = insert(initial, x3[0], x3[1]);
     }
   }
 }
@@ -242,16 +277,26 @@ function do_keys_loop(loop$list, loop$acc) {
     if (list.hasLength(0)) {
       return reverse_and_concat(acc, toList([]));
     } else {
-      let first2 = list.head;
+      let first3 = list.head;
       let rest = list.tail;
       loop$list = rest;
-      loop$acc = prepend(first2[0], acc);
+      loop$acc = prepend(first3[0], acc);
     }
   }
 }
 function keys(dict) {
   let list_of_pairs = map_to_list(dict);
   return do_keys_loop(list_of_pairs, toList([]));
+}
+
+// build/dev/javascript/gleam_stdlib/gleam/pair.mjs
+function first(pair) {
+  let a = pair[0];
+  return a;
+}
+function second(pair) {
+  let a = pair[1];
+  return a;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/list.mjs
@@ -274,20 +319,20 @@ function reverse(list) {
 }
 function append_loop(loop$first, loop$second) {
   while (true) {
-    let first2 = loop$first;
-    let second = loop$second;
-    if (first2.hasLength(0)) {
-      return second;
+    let first3 = loop$first;
+    let second2 = loop$second;
+    if (first3.hasLength(0)) {
+      return second2;
     } else {
-      let item = first2.head;
-      let rest$1 = first2.tail;
+      let item = first3.head;
+      let rest$1 = first3.tail;
       loop$first = rest$1;
-      loop$second = prepend(item, second);
+      loop$second = prepend(item, second2);
     }
   }
 }
-function append(first2, second) {
-  return append_loop(reverse(first2), second);
+function append(first3, second2) {
+  return append_loop(reverse(first3), second2);
 }
 function fold(loop$list, loop$initial, loop$fun) {
   while (true) {
@@ -297,10 +342,10 @@ function fold(loop$list, loop$initial, loop$fun) {
     if (list.hasLength(0)) {
       return initial;
     } else {
-      let x4 = list.head;
+      let x3 = list.head;
       let rest$1 = list.tail;
       loop$list = rest$1;
-      loop$initial = fun(initial, x4);
+      loop$initial = fun(initial, x3);
       loop$fun = fun;
     }
   }
@@ -309,9 +354,9 @@ function fold_right(list, initial, fun) {
   if (list.hasLength(0)) {
     return initial;
   } else {
-    let x4 = list.head;
+    let x3 = list.head;
     let rest$1 = list.tail;
-    return fun(fold_right(rest$1, initial, fun), x4);
+    return fun(fold_right(rest$1, initial, fun), x3);
   }
 }
 function index_fold_loop(loop$over, loop$acc, loop$with, loop$index) {
@@ -360,8 +405,8 @@ function drop_start(loop$string, loop$num_graphemes) {
 // build/dev/javascript/gleam_stdlib/gleam/result.mjs
 function try$(result, fun) {
   if (result.isOk()) {
-    let x4 = result[0];
-    return fun(x4);
+    let x3 = result[0];
+    return fun(x3);
   } else {
     let e = result[0];
     return new Error(e);
@@ -501,13 +546,13 @@ function mask(hash, shift) {
 function bitpos(hash, shift) {
   return 1 << mask(hash, shift);
 }
-function bitcount(x4) {
-  x4 -= x4 >> 1 & 1431655765;
-  x4 = (x4 & 858993459) + (x4 >> 2 & 858993459);
-  x4 = x4 + (x4 >> 4) & 252645135;
-  x4 += x4 >> 8;
-  x4 += x4 >> 16;
-  return x4 & 127;
+function bitcount(x3) {
+  x3 -= x3 >> 1 & 1431655765;
+  x3 = (x3 & 858993459) + (x3 >> 2 & 858993459);
+  x3 = x3 + (x3 >> 4) & 252645135;
+  x3 += x3 >> 8;
+  x3 += x3 >> 16;
+  return x3 & 127;
 }
 function index(bitmap, bit) {
   return bitcount(bitmap & bit - 1);
@@ -1085,8 +1130,8 @@ var unequalDictSymbol = Symbol();
 // build/dev/javascript/gleam_stdlib/gleam_stdlib.mjs
 var Nil = void 0;
 var NOT_FOUND = {};
-function identity(x4) {
-  return x4;
+function identity(x3) {
+  return x3;
 }
 function to_string(term) {
   return term.toString();
@@ -1099,15 +1144,15 @@ function graphemes_iterator(string2) {
   }
 }
 function pop_grapheme(string2) {
-  let first2;
+  let first3;
   const iterator = graphemes_iterator(string2);
   if (iterator) {
-    first2 = iterator.next().value?.segment;
+    first3 = iterator.next().value?.segment;
   } else {
-    first2 = string2.match(/./su)?.[0];
+    first3 = string2.match(/./su)?.[0];
   }
-  if (first2) {
-    return new Ok([first2, string2.slice(first2.length)]);
+  if (first3) {
+    return new Ok([first3, string2.slice(first3.length)]);
   } else {
     return new Error(Nil);
   }
@@ -1140,18 +1185,18 @@ function floor(float2) {
 function new_map() {
   return Dict.new();
 }
-function map_to_list(map5) {
-  return List.fromArray(map5.entries());
+function map_to_list(map4) {
+  return List.fromArray(map4.entries());
 }
-function map_get(map5, key) {
-  const value = map5.get(key, NOT_FOUND);
+function map_get(map4, key) {
+  const value = map4.get(key, NOT_FOUND);
   if (value === NOT_FOUND) {
     return new Error(Nil);
   }
   return new Ok(value);
 }
-function map_insert(key, value, map5) {
-  return map5.set(key, value);
+function map_insert(key, value, map4) {
+  return map4.set(key, value);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/float.mjs
@@ -1183,30 +1228,14 @@ function divide(a, b) {
     return new Ok(divideFloat(a, b$1));
   }
 }
-function add2(a, b) {
+function add3(a, b) {
   return a + b;
 }
-function multiply(a, b) {
+function multiply2(a, b) {
   return a * b;
 }
-function subtract(a, b) {
+function subtract2(a, b) {
   return a - b;
-}
-
-// build/dev/javascript/gleam_community_maths/maths.mjs
-function sin(float2) {
-  return Math.sin(float2);
-}
-function pi() {
-  return Math.PI;
-}
-
-// build/dev/javascript/gleam_community_maths/gleam_community/maths/elementary.mjs
-function sin2(x4) {
-  return sin(x4);
-}
-function pi2() {
-  return pi();
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/bool.mjs
@@ -1349,8 +1378,31 @@ function handlers(element2) {
 function attribute(name, value) {
   return new Attribute(name, identity(value), false);
 }
+function property(name, value) {
+  return new Attribute(name, identity(value), true);
+}
+function style(properties) {
+  return attribute(
+    "style",
+    fold(
+      properties,
+      "",
+      (styles, _use1) => {
+        let name$1 = _use1[0];
+        let value$1 = _use1[1];
+        return styles + name$1 + ":" + value$1 + ";";
+      }
+    )
+  );
+}
 function id(name) {
   return attribute("id", name);
+}
+function height(val) {
+  return property("height", val);
+}
+function width(val) {
+  return property("width", val);
 }
 
 // build/dev/javascript/lustre/lustre/element.mjs
@@ -1707,8 +1759,8 @@ function lustreServerEventHandler(event) {
   return {
     tag,
     data: include.reduce(
-      (data2, property) => {
-        const path = property.split(".");
+      (data2, property2) => {
+        const path = property2.split(".");
         for (let i = 0, o = data2, e = event; i < path.length; i++) {
           if (i === path.length - 1) {
             o[path[i]] = e[path[i]];
@@ -2085,6 +2137,58 @@ function canvas(attrs) {
   return element("canvas", attrs, toList([]));
 }
 
+// build/dev/javascript/client/lib/math.mjs
+var Double = class extends CustomType {
+};
+var Triple = class extends CustomType {
+};
+function scale(from2, amount) {
+  let by = (() => {
+    if (amount instanceof Double) {
+      return 2;
+    } else if (amount instanceof Triple) {
+      return 3;
+    } else {
+      return 4;
+    }
+  })();
+  return multiply2(from2, by);
+}
+
+// build/dev/javascript/client/lib/camera.mjs
+var Camera = class extends CustomType {
+  constructor(x3, y3, width3, height3) {
+    super();
+    this.x = x3;
+    this.y = y3;
+    this.width = width3;
+    this.height = height3;
+  }
+};
+function get_viewport(camera, scale2) {
+  return [
+    scale(
+      (() => {
+        let _pipe = camera.width;
+        return identity(_pipe);
+      })(),
+      scale2
+    ),
+    scale(
+      (() => {
+        let _pipe = camera.height;
+        return identity(_pipe);
+      })(),
+      scale2
+    )
+  ];
+}
+var width2 = 320;
+var height2 = 180;
+function new$3() {
+  return new Camera(divideInt(width2, 2), divideInt(height2, 2), width2, height2);
+}
+
 // build/dev/javascript/client/client_lib_canvas_ffi.mjs
 function get_canvas_by_id(id2) {
   const canvas2 = document.getElementById(id2);
@@ -2093,39 +2197,20 @@ function get_canvas_by_id(id2) {
   }
   return new Ok(canvas2);
 }
-function set_height(canvas2, height) {
-  canvas2.height = height;
-  return canvas2;
-}
-function set_width(canvas2, width) {
-  canvas2.width = width;
-  return canvas2;
-}
 function get_context_2d(canvas2) {
   const context = canvas2.getContext("2d");
   if (!context) {
     return new Error("Failed to get 2D context");
   }
+  context.imageSmoothingEnabled = false;
   return new Ok(context);
 }
-function set_fill_style(context, style2) {
-  context.fillStyle = style2;
-  return context;
-}
-function clear_rect(context, x4, y4, width, height) {
-  context.clearRect(x4, y4, width, height);
+function clear_rect(context, x3, y3, width3, height3) {
+  context.clearRect(x3, y3, width3, height3);
   return context;
 }
 function draw_image_cropped(context, image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight) {
   context.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
-  return context;
-}
-function fill_rect(context, x4, y4, width, height) {
-  context.fillRect(x4, y4, width, height);
-  return context;
-}
-function stroke_rect(context, x4, y4, width, height) {
-  context.strokeRect(x4, y4, width, height);
   return context;
 }
 
@@ -2139,43 +2224,6 @@ function load_image(src) {
   image.src = src;
   __asset_cache[src] = image;
   return image;
-}
-
-// build/dev/javascript/client/lib/coord.mjs
-var Coord = class extends CustomType {
-  constructor(x4, y4, width, height) {
-    super();
-    this.x = x4;
-    this.y = y4;
-    this.width = width;
-    this.height = height;
-  }
-};
-function new$3(width, height) {
-  return new Coord(0, 0, width, height);
-}
-function is_bounded_x(coord) {
-  return coord.x < coord.width - 1;
-}
-function is_bounded_y(coord) {
-  return coord.y < coord.height - 1;
-}
-function next(coord) {
-  let $ = is_bounded_x(coord);
-  let $1 = is_bounded_y(coord);
-  if ($) {
-    return coord.withFields({ x: coord.x + 1 });
-  } else if ($1) {
-    return coord.withFields({ y: coord.y + 1 });
-  } else {
-    return coord;
-  }
-}
-function x(coord) {
-  return coord.x;
-}
-function y(coord) {
-  return coord.y;
 }
 
 // build/dev/javascript/client/client_lib_engine_ffi.mjs
@@ -2264,50 +2312,28 @@ function from_game_key(game_key) {
   }
 }
 
-// build/dev/javascript/client/lib/math.mjs
-function interpolate(from2, to, progress) {
-  let _pipe = to;
-  let _pipe$1 = subtract(_pipe, from2);
-  let _pipe$2 = multiply(_pipe$1, progress);
-  return add2(_pipe$2, from2);
-}
-
 // build/dev/javascript/client/lib/vector.mjs
 var Vector = class extends CustomType {
-  constructor(x4, y4) {
+  constructor(x3, y3) {
     super();
-    this.x = x4;
-    this.y = y4;
+    this.x = x3;
+    this.y = y3;
   }
 };
 function new$4() {
   return new Vector(0, 0);
 }
-function at(x4, y4) {
-  return new Vector(x4, y4);
+function at(x3, y3) {
+  return new Vector(x3, y3);
 }
-function x2(vec) {
+function x(vec) {
   return vec.x;
 }
-function y2(vec) {
+function y(vec) {
   return vec.y;
 }
 function move(from2, by) {
-  return at(add2(from2.x, by.x), add2(from2.y, by.y));
-}
-function map4(vec, cb) {
-  return at(cb(vec.x), cb(vec.y));
-}
-function scale(vec, scale2) {
-  return map4(vec, (_capture) => {
-    return multiply(_capture, scale2);
-  });
-}
-function interpolate2(from2, to, progress) {
-  return at(
-    interpolate(from2.x, to.x, progress),
-    interpolate(from2.y, to.y, progress)
-  );
+  return at(add3(from2.x, by.x), add3(from2.y, by.y));
 }
 function from_direction(direction) {
   if (direction instanceof Up) {
@@ -2319,6 +2345,74 @@ function from_direction(direction) {
   } else {
     return at(1, 0);
   }
+}
+
+// build/dev/javascript/client/lib/coord.mjs
+var Coord = class extends CustomType {
+  constructor(x3, y3, z, width3, height3) {
+    super();
+    this.x = x3;
+    this.y = y3;
+    this.z = z;
+    this.width = width3;
+    this.height = height3;
+  }
+};
+function new$5(width3, height3) {
+  return new Coord(0, 0, 0, width3, height3);
+}
+function move2(from2, x3, y3, z) {
+  return new Coord(
+    clamp(from2.x + x3, 0, from2.width),
+    clamp(from2.y + y3, 0, from2.height),
+    z,
+    from2.width,
+    from2.height
+  );
+}
+function elevate(from2, z) {
+  return move2(from2, 0, 0, z);
+}
+function is_bounded_x(coord) {
+  return coord.x < coord.width - 1;
+}
+function is_bounded_y(coord) {
+  return coord.y < coord.height - 1;
+}
+function next(coord) {
+  let $ = is_bounded_x(coord);
+  let $1 = is_bounded_y(coord);
+  if ($) {
+    return coord.withFields({ x: coord.x + 1 });
+  } else if ($1) {
+    return coord.withFields({ x: 0, y: coord.y + 1 });
+  } else {
+    return coord;
+  }
+}
+var half_width = 16;
+var tile_height = 16;
+var half_height = 8;
+function adjust_by_z(y3, coord) {
+  return y3 - multiply(coord.z, half_height);
+}
+function to_vector(coord) {
+  let screen_x = subtract(160, half_width) + subtract(
+    coord.x,
+    coord.y
+  ) * half_width;
+  let screen_y = tile_height + add(coord.x, coord.y) * half_height;
+  return at(
+    (() => {
+      let _pipe = screen_x;
+      return identity(_pipe);
+    })(),
+    (() => {
+      let _pipe = screen_y;
+      let _pipe$1 = adjust_by_z(_pipe, coord);
+      return identity(_pipe$1);
+    })()
+  );
 }
 
 // build/dev/javascript/client/lib/cursor.mjs
@@ -2357,24 +2451,57 @@ function new_queue() {
 
 // build/dev/javascript/client/lib/sprite.mjs
 var SpriteRegion = class extends CustomType {
-  constructor(x4, y4) {
+  constructor(x3, y3) {
     super();
-    this.x = x4;
-    this.y = y4;
+    this.x = x3;
+    this.y = y3;
   }
 };
 var SpriteSheet = class extends CustomType {
-  constructor(asset, sprites2) {
+  constructor(asset, grid, sprites2) {
     super();
     this.asset = asset;
+    this.grid = grid;
     this.sprites = sprites2;
   }
 };
-function x3(sr) {
-  return sr.x;
+function x2(sr, grid) {
+  return sr.x * grid;
 }
-function y3(sr) {
-  return sr.y;
+function y2(sr, grid) {
+  return sr.y * grid;
+}
+function render(context, sheet, sprite_region, at2, scale2) {
+  return draw_image_cropped(
+    context,
+    sheet.asset,
+    (() => {
+      let _pipe = x2(sprite_region, sheet.grid);
+      return identity(_pipe);
+    })(),
+    (() => {
+      let _pipe = y2(sprite_region, sheet.grid);
+      return identity(_pipe);
+    })(),
+    32,
+    32,
+    (() => {
+      let _pipe = x(at2);
+      return scale(_pipe, scale2);
+    })(),
+    (() => {
+      let _pipe = y(at2);
+      return scale(_pipe, scale2);
+    })(),
+    (() => {
+      let _pipe = 32;
+      return scale(_pipe, scale2);
+    })(),
+    (() => {
+      let _pipe = 32;
+      return scale(_pipe, scale2);
+    })()
+  );
 }
 
 // build/dev/javascript/client/lib/asset/demo.mjs
@@ -2411,18 +2538,19 @@ function get_sprite_key(variant) {
 }
 var sprites = /* @__PURE__ */ toList([
   ["Base", /* @__PURE__ */ new SpriteRegion(0, 0)],
-  ["Variant1", /* @__PURE__ */ new SpriteRegion(0, 0)],
-  ["Variant2", /* @__PURE__ */ new SpriteRegion(0, 1)],
-  ["Variant3", /* @__PURE__ */ new SpriteRegion(0, 2)],
-  ["Variant4", /* @__PURE__ */ new SpriteRegion(0, 3)],
-  ["Variant5", /* @__PURE__ */ new SpriteRegion(0, 4)],
-  ["Variant6", /* @__PURE__ */ new SpriteRegion(0, 5)]
+  ["Variant1", /* @__PURE__ */ new SpriteRegion(1, 0)],
+  ["Variant2", /* @__PURE__ */ new SpriteRegion(2, 0)],
+  ["Variant3", /* @__PURE__ */ new SpriteRegion(3, 0)],
+  ["Variant4", /* @__PURE__ */ new SpriteRegion(4, 0)],
+  ["Variant5", /* @__PURE__ */ new SpriteRegion(5, 0)],
+  ["Variant6", /* @__PURE__ */ new SpriteRegion(6, 0)]
 ]);
 function sprite_sheet() {
   return new SpriteSheet(
     load_image(
-      "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/test-tile.png"
+      "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/test-tiles.png"
     ),
+    32,
     from_list(sprites)
   );
 }
@@ -2464,10 +2592,10 @@ function get_sprite(sprite_sheet2, terrain) {
 
 // build/dev/javascript/client/lib/map.mjs
 var Map3 = class extends CustomType {
-  constructor(width, height, sprite_sheet2, tiles) {
+  constructor(width3, height3, sprite_sheet2, tiles) {
     super();
-    this.width = width;
-    this.height = height;
+    this.width = width3;
+    this.height = height3;
     this.sprite_sheet = sprite_sheet2;
     this.tiles = tiles;
   }
@@ -2482,122 +2610,130 @@ function each_tile_loop(loop$tiles, loop$coords, loop$f) {
     } else {
       let tile = tiles.head;
       let rest = tiles.tail;
-      f(coords, tile);
+      f(elevate(coords, tile.elevation), tile);
       loop$tiles = rest;
       loop$coords = next(coords);
       loop$f = f;
     }
   }
 }
-function each_tile(map5, f) {
-  return each_tile_loop(map5.tiles, new$3(map5.width, map5.height), f);
+function each_tile(map4, f) {
+  return each_tile_loop(map4.tiles, new$5(map4.width, map4.height), f);
 }
 
 // build/dev/javascript/client/lib/engine.mjs
 var GameState = class extends CustomType {
-  constructor(previous_time, accumulator, event_queue, cursor, cursor_animation, fps, map5) {
+  constructor(accumulator, camera, cursor, cursor_animation, event_queue, fps, map4, previous_time, scale2) {
     super();
-    this.previous_time = previous_time;
     this.accumulator = accumulator;
-    this.event_queue = event_queue;
+    this.camera = camera;
     this.cursor = cursor;
     this.cursor_animation = cursor_animation;
+    this.event_queue = event_queue;
     this.fps = fps;
-    this.map = map5;
+    this.map = map4;
+    this.previous_time = previous_time;
+    this.scale = scale2;
   }
 };
-function new$5(init3, map5) {
+function new$6(init3, map4) {
   return new GameState(
-    init3,
     0,
-    new_queue(),
+    new$3(),
     new$4(),
     new_idle_cursor(),
+    new_queue(),
     0,
-    map5
+    map4,
+    init3,
+    new Double()
   );
 }
 
 // build/dev/javascript/client/lib/frames.mjs
 var dt_s = 0.01667;
 function to_duration(count) {
-  return multiply(dt_s, count);
+  return multiply2(dt_s, count);
 }
 
 // build/dev/javascript/client/lib/map/demo_one.mjs
-function new_tile(variant) {
-  return new Tile(0, new Demo(variant), new Passable());
+function new_tile(variant, elevation) {
+  return new Tile(
+    elevation,
+    new Demo(variant),
+    new Passable()
+  );
 }
-function new$6() {
+function new$7() {
   return new Map3(
     8,
     8,
     sprite_sheet(),
     toList([
-      new_tile(new Base()),
-      new_tile(new Variant1()),
-      new_tile(new Variant6()),
-      new_tile(new Base()),
-      new_tile(new Variant4()),
-      new_tile(new Variant5()),
-      new_tile(new Variant2()),
-      new_tile(new Base()),
-      new_tile(new Variant3()),
-      new_tile(new Variant4()),
-      new_tile(new Base()),
-      new_tile(new Variant5()),
-      new_tile(new Variant1()),
-      new_tile(new Base()),
-      new_tile(new Variant6()),
-      new_tile(new Variant2()),
-      new_tile(new Variant2()),
-      new_tile(new Base()),
-      new_tile(new Base()),
-      new_tile(new Variant1()),
-      new_tile(new Base()),
-      new_tile(new Variant3()),
-      new_tile(new Base()),
-      new_tile(new Base()),
-      new_tile(new Variant4()),
-      new_tile(new Base()),
-      new_tile(new Variant1()),
-      new_tile(new Variant3()),
-      new_tile(new Base()),
-      new_tile(new Base()),
-      new_tile(new Base()),
-      new_tile(new Variant2()),
-      new_tile(new Variant3()),
-      new_tile(new Base()),
-      new_tile(new Variant4()),
-      new_tile(new Base()),
-      new_tile(new Variant5()),
-      new_tile(new Base()),
-      new_tile(new Base()),
-      new_tile(new Variant1()),
-      new_tile(new Base()),
-      new_tile(new Variant1()),
-      new_tile(new Base()),
-      new_tile(new Variant3()),
-      new_tile(new Base()),
-      new_tile(new Variant2()),
-      new_tile(new Variant5()),
-      new_tile(new Base()),
-      new_tile(new Variant4()),
-      new_tile(new Variant2()),
-      new_tile(new Base()),
-      new_tile(new Base()),
-      new_tile(new Variant5()),
-      new_tile(new Base()),
-      new_tile(new Variant6()),
-      new_tile(new Base()),
-      new_tile(new Variant6()),
-      new_tile(new Base()),
-      new_tile(new Variant1()),
-      new_tile(new Variant4()),
-      new_tile(new Base()),
-      new_tile(new Base()),
-      new_tile(new Base()),
-      new_tile(new Variant2())
+      new_tile(new Base(), 0),
+      new_tile(new Variant1(), 0),
+      new_tile(new Variant6(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant4(), 0),
+      new_tile(new Variant5(), 0),
+      new_tile(new Variant2(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant3(), 0),
+      new_tile(new Variant4(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant5(), 0),
+      new_tile(new Variant1(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant6(), 0),
+      new_tile(new Variant2(), 0),
+      new_tile(new Variant2(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Base(), 1),
+      new_tile(new Variant1(), 1),
+      new_tile(new Variant1(), 1),
+      new_tile(new Base(), 1),
+      new_tile(new Variant3(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant4(), 0),
+      new_tile(new Base(), 1),
+      new_tile(new Variant1(), 2),
+      new_tile(new Variant3(), 2),
+      new_tile(new Base(), 1),
+      new_tile(new Base(), 0),
+      new_tile(new Variant2(), 0),
+      new_tile(new Variant3(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant4(), 1),
+      new_tile(new Base(), 2),
+      new_tile(new Variant5(), 2),
+      new_tile(new Base(), 1),
+      new_tile(new Base(), 0),
+      new_tile(new Variant1(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant1(), 0),
+      new_tile(new Base(), 1),
+      new_tile(new Variant3(), 1),
+      new_tile(new Base(), 1),
+      new_tile(new Variant2(), 1),
+      new_tile(new Variant5(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant4(), 0),
+      new_tile(new Variant2(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant5(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant6(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant6(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant1(), 0),
+      new_tile(new Variant4(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Base(), 0),
+      new_tile(new Variant2(), 0)
     ])
   );
 }
@@ -2677,7 +2813,7 @@ function run_logic_update(game_state, dt_seconds) {
       let amplitude = $.amplitude;
       let looped_elapsed = (() => {
         let _pipe = elapsed;
-        let _pipe$1 = add2(_pipe, dt_seconds);
+        let _pipe$1 = add3(_pipe, dt_seconds);
         let _pipe$2 = modulo(_pipe$1, cycle);
         return unwrap(_pipe$2, 0);
       })();
@@ -2687,7 +2823,7 @@ function run_logic_update(game_state, dt_seconds) {
       let target = $.target;
       let elapsed = $.elapsed;
       let duration = $.duration;
-      let new_elapsed = add2(elapsed, dt_seconds);
+      let new_elapsed = add3(elapsed, dt_seconds);
       let $1 = compare(new_elapsed, duration);
       if ($1 instanceof Lt) {
         return new CursorMoving(start3, target, new_elapsed, duration);
@@ -2764,131 +2900,52 @@ function schedule_next_frame() {
     }
   );
 }
-function scale_to_screen(from2) {
-  let _pipe = from2 * 32;
-  return identity(_pipe);
-}
-function render(game_state) {
+function render2(game_state) {
   return from(
     (_) => {
       return request_animation_frame(
         (_2) => {
           let $ = with_context();
           if ($.isOk() && $[0] instanceof RenderContext) {
-            let canvas2 = $[0][0];
             let context = $[0][1];
-            let _pipe = canvas2;
-            let _pipe$1 = set_width(_pipe, game_state.map.width);
-            set_height(_pipe$1, game_state.map.height);
-            let _pipe$2 = game_state.map;
-            each_tile(
-              _pipe$2,
+            let viewport = get_viewport(
+              game_state.camera,
+              game_state.scale
+            );
+            clear_rect(
+              context,
+              0,
+              0,
+              first(viewport),
+              second(viewport)
+            );
+            let _pipe = game_state.map;
+            return each_tile(
+              _pipe,
               (coords, tile) => {
                 let sprite_region = (() => {
-                  let _pipe$32 = game_state.map.sprite_sheet;
-                  return get_sprite(_pipe$32, tile.terrain);
+                  let _pipe$1 = game_state.map.sprite_sheet;
+                  return get_sprite(_pipe$1, tile.terrain);
                 })();
                 if (sprite_region.isOk()) {
                   let region = sprite_region[0];
-                  return draw_image_cropped(
+                  return render(
                     context,
-                    game_state.map.sprite_sheet.asset,
-                    (() => {
-                      let _pipe$32 = x3(region);
-                      return scale_to_screen(_pipe$32);
-                    })(),
-                    (() => {
-                      let _pipe$32 = y3(region);
-                      return scale_to_screen(_pipe$32);
-                    })(),
-                    32,
-                    32,
-                    (() => {
-                      let _pipe$32 = x(coords);
-                      return scale_to_screen(_pipe$32);
-                    })(),
-                    (() => {
-                      let _pipe$32 = y(coords);
-                      return scale_to_screen(_pipe$32);
-                    })(),
-                    32,
-                    32
+                    game_state.map.sprite_sheet,
+                    region,
+                    to_vector(coords),
+                    game_state.scale
                   );
                 } else {
                   return context;
                 }
               }
             );
-            let new_cursor = (() => {
-              let $1 = game_state.cursor_animation;
-              if ($1 instanceof CursorIdle) {
-                let elapsed = $1.elapsed;
-                let cycle = $1.cycle;
-                let amplitude = $1.amplitude;
-                let t = (() => {
-                  let _pipe$32 = divide(elapsed, cycle);
-                  return unwrap(_pipe$32, 0);
-                })();
-                let start3 = (() => {
-                  let _pipe$32 = game_state.cursor;
-                  return scale(_pipe$32, 10);
-                })();
-                let offset_y = (() => {
-                  let _pipe$32 = t;
-                  let _pipe$42 = multiply(_pipe$32, 2);
-                  let _pipe$52 = multiply(_pipe$42, pi2());
-                  let _pipe$62 = sin2(_pipe$52);
-                  let _pipe$7 = multiply(_pipe$62, amplitude);
-                  return add2(_pipe$7, y2(start3));
-                })();
-                return move(
-                  at(x2(start3), offset_y),
-                  at(25, 25)
-                );
-              } else {
-                let start3 = $1.start;
-                let target = $1.target;
-                let elapsed = $1.elapsed;
-                let duration = $1.duration;
-                let t = (() => {
-                  let _pipe$33 = divide(elapsed, duration);
-                  return unwrap(_pipe$33, 0);
-                })();
-                let _pipe$32 = start3;
-                let _pipe$42 = interpolate2(_pipe$32, target, t);
-                let _pipe$52 = scale(_pipe$42, 10);
-                return move(_pipe$52, at(25, 25));
-              }
-            })();
-            let _pipe$3 = context;
-            let _pipe$4 = clear_rect(
-              _pipe$3,
-              0,
-              0,
-              1e3,
-              1e3
-            );
-            let _pipe$5 = stroke_rect(
-              _pipe$4,
-              0,
-              0,
-              1e3,
-              1e3
-            );
-            let _pipe$6 = set_fill_style(_pipe$5, "#FA470A");
-            fill_rect(
-              _pipe$6,
-              x2(new_cursor),
-              y2(new_cursor),
-              50,
-              50
-            );
-            return void 0;
           } else {
             throw makeError(
               "panic",
               "client",
-              330,
+              298,
               "",
               "`panic` expression evaluated.",
               {}
@@ -2902,13 +2959,27 @@ function render(game_state) {
 function update_and_schedule(game_state) {
   return [
     new Ready(game_state),
-    batch(toList([render(game_state), schedule_next_frame()]))
+    batch(toList([render2(game_state), schedule_next_frame()]))
   ];
 }
-function view(_) {
+function view(model) {
   return div(
     toList([]),
-    toList([canvas(toList([id(render_target_id)]))])
+    toList([
+      canvas(
+        toList([
+          id(render_target_id),
+          width(640),
+          height(360),
+          style(
+            toList([
+              ["image-rendering", "pixelated"],
+              ["border", "1px solid black"]
+            ])
+          )
+        ])
+      )
+    ])
   );
 }
 var fixed_dt = 16.67;
@@ -2929,15 +3000,15 @@ function engine_update_loop(loop$game_state, loop$acc) {
       let _pipe$1 = apply_events(_pipe, game_state.event_queue);
       let _pipe$2 = run_logic_update(_pipe$1, dt_seconds);
       loop$game_state = _pipe$2;
-      loop$acc = subtract(acc, fixed_dt);
+      loop$acc = subtract2(acc, fixed_dt);
     } else {
       return game_state.withFields({ accumulator: 0 });
     }
   }
 }
 function engine_update(game_state, current_time) {
-  let frame_time = subtract(current_time, game_state.previous_time);
-  let accumulator = add2(game_state.accumulator, frame_time);
+  let frame_time = subtract2(current_time, game_state.previous_time);
+  let accumulator = add3(game_state.accumulator, frame_time);
   let fps = (() => {
     let $ = divide(1e3, frame_time);
     if ($.isOk()) {
@@ -2958,7 +3029,7 @@ function update(model, msg) {
   if (msg instanceof AppInitEngine) {
     let previous_time = msg[0];
     return [
-      new Ready(new$5(previous_time, new$6())),
+      new Ready(new$6(previous_time, new$7())),
       batch(toList([setup_listeners(), schedule_next_frame()]))
     ];
   } else if (msg instanceof AppSetNoCanvas) {

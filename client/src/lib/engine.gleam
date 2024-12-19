@@ -1,29 +1,35 @@
+import lib/camera
 import lib/cursor
 import lib/event
 import lib/map
+import lib/math
 import lib/vector
 
 pub type GameState {
   GameState(
-    previous_time: Float,
     accumulator: Float,
-    event_queue: List(event.Event),
+    camera: camera.Camera,
     cursor: vector.Vector,
     cursor_animation: cursor.CursorAnimation,
+    event_queue: List(event.Event),
     fps: Float,
     map: map.Map,
+    previous_time: Float,
+    scale: math.Scale,
   )
 }
 
 pub fn new(init: Float, map: map.Map) -> GameState {
   GameState(
-    previous_time: init,
     accumulator: 0.0,
-    event_queue: event.new_queue(),
+    camera: camera.new(),
     cursor: vector.new(),
     cursor_animation: cursor.new_idle_cursor(),
+    event_queue: event.new_queue(),
     fps: 0.0,
     map: map,
+    previous_time: init,
+    scale: math.Double,
   )
 }
 

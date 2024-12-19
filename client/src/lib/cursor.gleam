@@ -15,3 +15,7 @@ pub type CursorAnimation {
 pub fn new_idle_cursor() -> CursorAnimation {
   cursor_idle_info
 }
+
+pub fn render() {
+  todo
+}

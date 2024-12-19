@@ -23,7 +23,7 @@ fn each_tile_loop(
   case tiles {
     [] -> Nil
     [tile, ..rest] -> {
-      f(coords, tile)
+      f(coord.elevate(coords, tile.elevation), tile)
       each_tile_loop(rest, coord.next(coords), f)
     }
   }
