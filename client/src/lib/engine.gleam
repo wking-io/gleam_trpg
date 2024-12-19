@@ -1,5 +1,6 @@
 import lib/cursor
 import lib/event
+import lib/map
 import lib/vector
 
 pub type GameState {
@@ -10,10 +11,11 @@ pub type GameState {
     cursor: vector.Vector,
     cursor_animation: cursor.CursorAnimation,
     fps: Float,
+    map: map.Map,
   )
 }
 
-pub fn new(init: Float) -> GameState {
+pub fn new(init: Float, map: map.Map) -> GameState {
   GameState(
     previous_time: init,
     accumulator: 0.0,
@@ -21,6 +23,7 @@ pub fn new(init: Float) -> GameState {
     cursor: vector.new(),
     cursor_animation: cursor.new_idle_cursor(),
     fps: 0.0,
+    map: map,
   )
 }
 

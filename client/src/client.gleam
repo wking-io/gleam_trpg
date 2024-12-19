@@ -1,19 +1,26 @@
 // IMPORTS ---------------------------------------------------------------------
 
 import gleam/float
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/order.{type Order}
 import gleam/result
 import gleam_community/maths/elementary
+import lib/canvas as canvas_impl
 import lib/canvas/context as context_impl
+import lib/coord
 import lib/cursor
 import lib/direction
 import lib/engine
 import lib/event
 import lib/frames
 import lib/input
+import lib/map
+import lib/map/demo_one
 import lib/render
+import lib/sprite
+import lib/tile
 import lib/vector
 import lustre
 import lustre/attribute
@@ -45,7 +52,7 @@ fn init(_) -> #(Model, Effect(Msg)) {
 // UPDATE ----------------------------------------------------------------------
 
 type Msg {
-  AppInitCanvas(Float)
+  AppInitEngine(Float)
   AppSetNoCanvas
   Tick(Float)
   PlayerQueueEvent(event.Event)
@@ -57,8 +64,8 @@ type Event {
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
   case msg {
-    AppInitCanvas(previous_time) -> #(
-      Ready(engine.new(previous_time)),
+    AppInitEngine(previous_time) -> #(
+      Ready(engine.new(previous_time, demo_one.new())),
       effect.batch([setup_listeners(), schedule_next_frame()]),
     )
     AppSetNoCanvas -> #(NoCanvas, effect.none())
@@ -226,13 +233,7 @@ fn is_gt_or_eq(order: Order) -> Bool {
 fn init_canvas() {
   effect.from(fn(dispatch) {
     engine.request_animation_frame(fn(timestamp) {
-      case render.with_context() {
-        Ok(render.RenderContext(_canvas, context)) -> {
-          context_impl.fill_rect(context, 0.0, 0.0, 1000.0, 1000.0)
-          dispatch(AppInitCanvas(timestamp))
-        }
-        _ -> dispatch(AppSetNoCanvas)
-      }
+      dispatch(AppInitEngine(timestamp))
     })
   })
 }
@@ -249,11 +250,44 @@ fn view(_model: Model) -> Element(Msg) {
   html.div([], [html.canvas([attribute.id(render.render_target_id)])])
 }
 
+fn scale_to_screen(from: Int) {
+  from * 32 |> int.to_float()
+}
+
 fn render(game_state: engine.GameState) -> Effect(Msg) {
   effect.from(fn(_dispatch) {
     engine.request_animation_frame(fn(_timestamp) {
       case render.with_context() {
-        Ok(render.RenderContext(_canvas, context)) -> {
+        Ok(render.RenderContext(canvas, context)) -> {
+          canvas
+          |> canvas_impl.set_width(game_state.map.width)
+          |> canvas_impl.set_height(game_state.map.height)
+
+          game_state.map
+          |> map.each_tile(fn(coords, tile) {
+            let sprite_region =
+              game_state.map.sprite_sheet
+              |> tile.get_sprite(tile.terrain)
+
+            case sprite_region {
+              Ok(region) -> {
+                context_impl.draw_image_cropped(
+                  context,
+                  game_state.map.sprite_sheet.asset,
+                  sprite.x(region) |> scale_to_screen(),
+                  sprite.y(region) |> scale_to_screen(),
+                  32.0,
+                  32.0,
+                  coord.x(coords) |> scale_to_screen(),
+                  coord.y(coords) |> scale_to_screen(),
+                  32.0,
+                  32.0,
+                )
+              }
+              _ -> context
+            }
+          })
+
           let new_cursor = case game_state.cursor_animation {
             cursor.CursorIdle(elapsed, cycle, amplitude) -> {
               let t = float.divide(elapsed, cycle) |> result.unwrap(0.0)

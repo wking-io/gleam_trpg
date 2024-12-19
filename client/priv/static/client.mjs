@@ -103,8 +103,8 @@ var Error = class extends Result {
     return false;
   }
 };
-function isEqual(x, y) {
-  let values = [x, y];
+function isEqual(x4, y4) {
+  let values = [x4, y4];
   while (values.length) {
     let a = values.pop();
     let b = values.pop();
@@ -134,10 +134,10 @@ function isEqual(x, y) {
 }
 function getters(object3) {
   if (object3 instanceof Map) {
-    return [(x) => x.keys(), (x, y) => x.get(y)];
+    return [(x4) => x4.keys(), (x4, y4) => x4.get(y4)];
   } else {
     let extra = object3 instanceof globalThis.Error ? ["message"] : [];
-    return [(x) => [...extra, ...Object.keys(x)], (x, y) => x[y]];
+    return [(x4) => [...extra, ...Object.keys(x4)], (x4, y4) => x4[y4]];
   }
 }
 function unequalDates(a, b) {
@@ -203,6 +203,23 @@ var None = class extends CustomType {
 // build/dev/javascript/gleam_stdlib/gleam/dict.mjs
 function insert(dict, key, value) {
   return map_insert(key, value, dict);
+}
+function from_list_loop(loop$list, loop$initial) {
+  while (true) {
+    let list = loop$list;
+    let initial = loop$initial;
+    if (list.hasLength(0)) {
+      return initial;
+    } else {
+      let x4 = list.head;
+      let rest = list.tail;
+      loop$list = rest;
+      loop$initial = insert(initial, x4[0], x4[1]);
+    }
+  }
+}
+function from_list(list) {
+  return from_list_loop(list, new_map());
 }
 function reverse_and_concat(loop$remaining, loop$accumulator) {
   while (true) {
@@ -280,10 +297,10 @@ function fold(loop$list, loop$initial, loop$fun) {
     if (list.hasLength(0)) {
       return initial;
     } else {
-      let x = list.head;
+      let x4 = list.head;
       let rest$1 = list.tail;
       loop$list = rest$1;
-      loop$initial = fun(initial, x);
+      loop$initial = fun(initial, x4);
       loop$fun = fun;
     }
   }
@@ -292,9 +309,9 @@ function fold_right(list, initial, fun) {
   if (list.hasLength(0)) {
     return initial;
   } else {
-    let x = list.head;
+    let x4 = list.head;
     let rest$1 = list.tail;
-    return fun(fold_right(rest$1, initial, fun), x);
+    return fun(fold_right(rest$1, initial, fun), x4);
   }
 }
 function index_fold_loop(loop$over, loop$acc, loop$with, loop$index) {
@@ -343,8 +360,8 @@ function drop_start(loop$string, loop$num_graphemes) {
 // build/dev/javascript/gleam_stdlib/gleam/result.mjs
 function try$(result, fun) {
   if (result.isOk()) {
-    let x = result[0];
-    return fun(x);
+    let x4 = result[0];
+    return fun(x4);
   } else {
     let e = result[0];
     return new Error(e);
@@ -484,32 +501,32 @@ function mask(hash, shift) {
 function bitpos(hash, shift) {
   return 1 << mask(hash, shift);
 }
-function bitcount(x) {
-  x -= x >> 1 & 1431655765;
-  x = (x & 858993459) + (x >> 2 & 858993459);
-  x = x + (x >> 4) & 252645135;
-  x += x >> 8;
-  x += x >> 16;
-  return x & 127;
+function bitcount(x4) {
+  x4 -= x4 >> 1 & 1431655765;
+  x4 = (x4 & 858993459) + (x4 >> 2 & 858993459);
+  x4 = x4 + (x4 >> 4) & 252645135;
+  x4 += x4 >> 8;
+  x4 += x4 >> 16;
+  return x4 & 127;
 }
 function index(bitmap, bit) {
   return bitcount(bitmap & bit - 1);
 }
-function cloneAndSet(arr, at, val) {
+function cloneAndSet(arr, at2, val) {
   const len = arr.length;
   const out = new Array(len);
   for (let i = 0; i < len; ++i) {
     out[i] = arr[i];
   }
-  out[at] = val;
+  out[at2] = val;
   return out;
 }
-function spliceIn(arr, at, val) {
+function spliceIn(arr, at2, val) {
   const len = arr.length;
   const out = new Array(len + 1);
   let i = 0;
   let g = 0;
-  while (i < at) {
+  while (i < at2) {
     out[g++] = arr[i++];
   }
   out[g++] = val;
@@ -518,12 +535,12 @@ function spliceIn(arr, at, val) {
   }
   return out;
 }
-function spliceOut(arr, at) {
+function spliceOut(arr, at2) {
   const len = arr.length;
   const out = new Array(len - 1);
   let i = 0;
   let g = 0;
-  while (i < at) {
+  while (i < at2) {
     out[g++] = arr[i++];
   }
   ++i;
@@ -1067,8 +1084,9 @@ var unequalDictSymbol = Symbol();
 
 // build/dev/javascript/gleam_stdlib/gleam_stdlib.mjs
 var Nil = void 0;
-function identity(x) {
-  return x;
+var NOT_FOUND = {};
+function identity(x4) {
+  return x4;
 }
 function to_string(term) {
   return term.toString();
@@ -1122,11 +1140,18 @@ function floor(float2) {
 function new_map() {
   return Dict.new();
 }
-function map_to_list(map4) {
-  return List.fromArray(map4.entries());
+function map_to_list(map5) {
+  return List.fromArray(map5.entries());
 }
-function map_insert(key, value, map4) {
-  return map4.set(key, value);
+function map_get(map5, key) {
+  const value = map5.get(key, NOT_FOUND);
+  if (value === NOT_FOUND) {
+    return new Error(Nil);
+  }
+  return new Ok(value);
+}
+function map_insert(key, value, map5) {
+  return map5.set(key, value);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/float.mjs
@@ -1177,8 +1202,8 @@ function pi() {
 }
 
 // build/dev/javascript/gleam_community_maths/gleam_community/maths/elementary.mjs
-function sin2(x) {
-  return sin(x);
+function sin2(x4) {
+  return sin(x4);
 }
 function pi2() {
   return pi();
@@ -1475,31 +1500,31 @@ if (globalThis.customElements && !globalThis.customElements.get("lustre-fragment
     }
   );
 }
-function morph(prev, next, dispatch) {
+function morph(prev, next2, dispatch) {
   let out;
-  let stack = [{ prev, next, parent: prev.parentNode }];
+  let stack = [{ prev, next: next2, parent: prev.parentNode }];
   while (stack.length) {
-    let { prev: prev2, next: next2, parent } = stack.pop();
-    while (next2.subtree !== void 0)
-      next2 = next2.subtree();
-    if (next2.content !== void 0) {
+    let { prev: prev2, next: next3, parent } = stack.pop();
+    while (next3.subtree !== void 0)
+      next3 = next3.subtree();
+    if (next3.content !== void 0) {
       if (!prev2) {
-        const created = document.createTextNode(next2.content);
+        const created = document.createTextNode(next3.content);
         parent.appendChild(created);
         out ??= created;
       } else if (prev2.nodeType === Node.TEXT_NODE) {
-        if (prev2.textContent !== next2.content)
-          prev2.textContent = next2.content;
+        if (prev2.textContent !== next3.content)
+          prev2.textContent = next3.content;
         out ??= prev2;
       } else {
-        const created = document.createTextNode(next2.content);
+        const created = document.createTextNode(next3.content);
         parent.replaceChild(created, prev2);
         out ??= created;
       }
-    } else if (next2.tag !== void 0) {
+    } else if (next3.tag !== void 0) {
       const created = createElementNode({
         prev: prev2,
-        next: next2,
+        next: next3,
         dispatch,
         stack
       });
@@ -1513,10 +1538,10 @@ function morph(prev, next, dispatch) {
   }
   return out;
 }
-function createElementNode({ prev, next, dispatch, stack }) {
-  const namespace = next.namespace || "http://www.w3.org/1999/xhtml";
-  const canMorph = prev && prev.nodeType === Node.ELEMENT_NODE && prev.localName === next.tag && prev.namespaceURI === (next.namespace || "http://www.w3.org/1999/xhtml");
-  const el = canMorph ? prev : namespace ? document.createElementNS(namespace, next.tag) : document.createElement(next.tag);
+function createElementNode({ prev, next: next2, dispatch, stack }) {
+  const namespace = next2.namespace || "http://www.w3.org/1999/xhtml";
+  const canMorph = prev && prev.nodeType === Node.ELEMENT_NODE && prev.localName === next2.tag && prev.namespaceURI === (next2.namespace || "http://www.w3.org/1999/xhtml");
+  const el = canMorph ? prev : namespace ? document.createElementNS(namespace, next2.tag) : document.createElement(next2.tag);
   let handlersForEl;
   if (!registeredHandlers.has(el)) {
     const emptyHandlers = /* @__PURE__ */ new Map();
@@ -1530,13 +1555,13 @@ function createElementNode({ prev, next, dispatch, stack }) {
   let className = null;
   let style2 = null;
   let innerHTML = null;
-  if (canMorph && next.tag === "textarea") {
-    const innertText = next.children[Symbol.iterator]().next().value?.content;
+  if (canMorph && next2.tag === "textarea") {
+    const innertText = next2.children[Symbol.iterator]().next().value?.content;
     if (innertText !== void 0)
       el.value = innertText;
   }
   const delegated = [];
-  for (const attr of next.attrs) {
+  for (const attr of next2.attrs) {
     const name = attr[0];
     const value = attr[1];
     if (attr.as_property) {
@@ -1602,7 +1627,7 @@ function createElementNode({ prev, next, dispatch, stack }) {
       el.removeEventListener(eventName, lustreGenericEventHandler);
     }
   }
-  if (next.tag === "slot") {
+  if (next2.tag === "slot") {
     window.queueMicrotask(() => {
       for (const child of el.assignedElements()) {
         for (const [name, value] of delegated) {
@@ -1613,8 +1638,8 @@ function createElementNode({ prev, next, dispatch, stack }) {
       }
     });
   }
-  if (next.key !== void 0 && next.key !== "") {
-    el.setAttribute("data-lustre-key", next.key);
+  if (next2.key !== void 0 && next2.key !== "") {
+    el.setAttribute("data-lustre-key", next2.key);
   } else if (innerHTML !== null) {
     el.innerHTML = innerHTML;
     return el;
@@ -1623,14 +1648,14 @@ function createElementNode({ prev, next, dispatch, stack }) {
   let seenKeys = null;
   let keyedChildren = null;
   let incomingKeyedChildren = null;
-  let firstChild = children(next).next().value;
+  let firstChild = children(next2).next().value;
   if (canMorph && firstChild !== void 0 && // Explicit checks are more verbose but truthy checks force a bunch of comparisons
   // we don't care about: it's never gonna be a number etc.
   firstChild.key !== void 0 && firstChild.key !== "") {
     seenKeys = /* @__PURE__ */ new Set();
     keyedChildren = getKeyedChildren(prev);
-    incomingKeyedChildren = getKeyedChildren(next);
-    for (const child of children(next)) {
+    incomingKeyedChildren = getKeyedChildren(next2);
+    for (const child of children(next2)) {
       prevChild = diffKeyedChild(
         prevChild,
         child,
@@ -1642,15 +1667,15 @@ function createElementNode({ prev, next, dispatch, stack }) {
       );
     }
   } else {
-    for (const child of children(next)) {
+    for (const child of children(next2)) {
       stack.unshift({ prev: prevChild, next: child, parent: el });
       prevChild = prevChild?.nextSibling;
     }
   }
   while (prevChild) {
-    const next2 = prevChild.nextSibling;
+    const next3 = prevChild.nextSibling;
     el.removeChild(prevChild);
-    prevChild = next2;
+    prevChild = next3;
   }
   return el;
 }
@@ -1883,9 +1908,9 @@ var LustreClientApplication = class _LustreClientApplication {
   #flush(effects = []) {
     while (this.#queue.length > 0) {
       const msg = this.#queue.shift();
-      const [next, effect] = this.#update(this.#model, msg);
+      const [next2, effect] = this.#update(this.#model, msg);
       effects = effects.concat(effect.all.toArray());
-      this.#model = next;
+      this.#model = next2;
     }
     while (effects.length > 0) {
       const effect = effects.shift();
@@ -1994,9 +2019,9 @@ var LustreServerApplication = class _LustreServerApplication {
   #flush(effects = []) {
     while (this.#queue.length > 0) {
       const msg = this.#queue.shift();
-      const [next, effect] = this.#update(this.#model, msg);
+      const [next2, effect] = this.#update(this.#model, msg);
       effects = effects.concat(effect.all.toArray());
-      this.#model = next;
+      this.#model = next2;
     }
     while (effects.length > 0) {
       const effect = effects.shift();
@@ -2068,6 +2093,14 @@ function get_canvas_by_id(id2) {
   }
   return new Ok(canvas2);
 }
+function set_height(canvas2, height) {
+  canvas2.height = height;
+  return canvas2;
+}
+function set_width(canvas2, width) {
+  canvas2.width = width;
+  return canvas2;
+}
 function get_context_2d(canvas2) {
   const context = canvas2.getContext("2d");
   if (!context) {
@@ -2079,17 +2112,70 @@ function set_fill_style(context, style2) {
   context.fillStyle = style2;
   return context;
 }
-function clear_rect(context, x, y, width, height) {
-  context.clearRect(x, y, width, height);
+function clear_rect(context, x4, y4, width, height) {
+  context.clearRect(x4, y4, width, height);
   return context;
 }
-function fill_rect(context, x, y, width, height) {
-  context.fillRect(x, y, width, height);
+function draw_image_cropped(context, image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight) {
+  context.drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
   return context;
 }
-function stroke_rect(context, x, y, width, height) {
-  context.strokeRect(x, y, width, height);
+function fill_rect(context, x4, y4, width, height) {
+  context.fillRect(x4, y4, width, height);
   return context;
+}
+function stroke_rect(context, x4, y4, width, height) {
+  context.strokeRect(x4, y4, width, height);
+  return context;
+}
+
+// build/dev/javascript/client/client_lib_asset_ffi.mjs
+var __asset_cache = {};
+function load_image(src) {
+  const cached_image = __asset_cache[src];
+  if (cached_image)
+    return cached_image;
+  const image = new Image();
+  image.src = src;
+  __asset_cache[src] = image;
+  return image;
+}
+
+// build/dev/javascript/client/lib/coord.mjs
+var Coord = class extends CustomType {
+  constructor(x4, y4, width, height) {
+    super();
+    this.x = x4;
+    this.y = y4;
+    this.width = width;
+    this.height = height;
+  }
+};
+function new$3(width, height) {
+  return new Coord(0, 0, width, height);
+}
+function is_bounded_x(coord) {
+  return coord.x < coord.width - 1;
+}
+function is_bounded_y(coord) {
+  return coord.y < coord.height - 1;
+}
+function next(coord) {
+  let $ = is_bounded_x(coord);
+  let $1 = is_bounded_y(coord);
+  if ($) {
+    return coord.withFields({ x: coord.x + 1 });
+  } else if ($1) {
+    return coord.withFields({ y: coord.y + 1 });
+  } else {
+    return coord;
+  }
+}
+function x(coord) {
+  return coord.x;
+}
+function y(coord) {
+  return coord.y;
 }
 
 // build/dev/javascript/client/client_lib_engine_ffi.mjs
@@ -2112,7 +2198,7 @@ function add_keyboard_event_listener(cb) {
   return window.addEventListener("keydown", with_keyboard_data(cb));
 }
 
-// build/dev/javascript/client/lib/engine.mjs
+// build/dev/javascript/client/lib/input.mjs
 var UpKey = class extends CustomType {
 };
 var DownKey = class extends CustomType {
@@ -2157,6 +2243,365 @@ function on_keyboard_event(cb) {
   );
 }
 
+// build/dev/javascript/client/lib/direction.mjs
+var Up = class extends CustomType {
+};
+var Down = class extends CustomType {
+};
+var Right = class extends CustomType {
+};
+var Left = class extends CustomType {
+};
+function from_game_key(game_key) {
+  if (game_key instanceof UpKey) {
+    return new Up();
+  } else if (game_key instanceof DownKey) {
+    return new Down();
+  } else if (game_key instanceof LeftKey) {
+    return new Left();
+  } else {
+    return new Right();
+  }
+}
+
+// build/dev/javascript/client/lib/math.mjs
+function interpolate(from2, to, progress) {
+  let _pipe = to;
+  let _pipe$1 = subtract(_pipe, from2);
+  let _pipe$2 = multiply(_pipe$1, progress);
+  return add2(_pipe$2, from2);
+}
+
+// build/dev/javascript/client/lib/vector.mjs
+var Vector = class extends CustomType {
+  constructor(x4, y4) {
+    super();
+    this.x = x4;
+    this.y = y4;
+  }
+};
+function new$4() {
+  return new Vector(0, 0);
+}
+function at(x4, y4) {
+  return new Vector(x4, y4);
+}
+function x2(vec) {
+  return vec.x;
+}
+function y2(vec) {
+  return vec.y;
+}
+function move(from2, by) {
+  return at(add2(from2.x, by.x), add2(from2.y, by.y));
+}
+function map4(vec, cb) {
+  return at(cb(vec.x), cb(vec.y));
+}
+function scale(vec, scale2) {
+  return map4(vec, (_capture) => {
+    return multiply(_capture, scale2);
+  });
+}
+function interpolate2(from2, to, progress) {
+  return at(
+    interpolate(from2.x, to.x, progress),
+    interpolate(from2.y, to.y, progress)
+  );
+}
+function from_direction(direction) {
+  if (direction instanceof Up) {
+    return at(0, -1);
+  } else if (direction instanceof Down) {
+    return at(0, 1);
+  } else if (direction instanceof Left) {
+    return at(-1, 0);
+  } else {
+    return at(1, 0);
+  }
+}
+
+// build/dev/javascript/client/lib/cursor.mjs
+var CursorIdle = class extends CustomType {
+  constructor(elapsed, cycle, amplitude) {
+    super();
+    this.elapsed = elapsed;
+    this.cycle = cycle;
+    this.amplitude = amplitude;
+  }
+};
+var CursorMoving = class extends CustomType {
+  constructor(start3, target, elapsed, duration) {
+    super();
+    this.start = start3;
+    this.target = target;
+    this.elapsed = elapsed;
+    this.duration = duration;
+  }
+};
+var cursor_idle_info = /* @__PURE__ */ new CursorIdle(0, 0.75, 1);
+function new_idle_cursor() {
+  return cursor_idle_info;
+}
+
+// build/dev/javascript/client/lib/event.mjs
+var MoveCursor = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+function new_queue() {
+  return toList([]);
+}
+
+// build/dev/javascript/client/lib/sprite.mjs
+var SpriteRegion = class extends CustomType {
+  constructor(x4, y4) {
+    super();
+    this.x = x4;
+    this.y = y4;
+  }
+};
+var SpriteSheet = class extends CustomType {
+  constructor(asset, sprites2) {
+    super();
+    this.asset = asset;
+    this.sprites = sprites2;
+  }
+};
+function x3(sr) {
+  return sr.x;
+}
+function y3(sr) {
+  return sr.y;
+}
+
+// build/dev/javascript/client/lib/asset/demo.mjs
+var Base = class extends CustomType {
+};
+var Variant1 = class extends CustomType {
+};
+var Variant2 = class extends CustomType {
+};
+var Variant3 = class extends CustomType {
+};
+var Variant4 = class extends CustomType {
+};
+var Variant5 = class extends CustomType {
+};
+var Variant6 = class extends CustomType {
+};
+function get_sprite_key(variant) {
+  if (variant instanceof Base) {
+    return "Base";
+  } else if (variant instanceof Variant1) {
+    return "Variant1";
+  } else if (variant instanceof Variant2) {
+    return "Variant2";
+  } else if (variant instanceof Variant3) {
+    return "Variant3";
+  } else if (variant instanceof Variant4) {
+    return "Variant4";
+  } else if (variant instanceof Variant5) {
+    return "Variant5";
+  } else {
+    return "Variant6";
+  }
+}
+var sprites = /* @__PURE__ */ toList([
+  ["Base", /* @__PURE__ */ new SpriteRegion(0, 0)],
+  ["Variant1", /* @__PURE__ */ new SpriteRegion(0, 0)],
+  ["Variant2", /* @__PURE__ */ new SpriteRegion(0, 1)],
+  ["Variant3", /* @__PURE__ */ new SpriteRegion(0, 2)],
+  ["Variant4", /* @__PURE__ */ new SpriteRegion(0, 3)],
+  ["Variant5", /* @__PURE__ */ new SpriteRegion(0, 4)],
+  ["Variant6", /* @__PURE__ */ new SpriteRegion(0, 5)]
+]);
+function sprite_sheet() {
+  return new SpriteSheet(
+    load_image(
+      "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/test-tile.png"
+    ),
+    from_list(sprites)
+  );
+}
+
+// build/dev/javascript/client/lib/tile.mjs
+var Tile = class extends CustomType {
+  constructor(elevation, terrain, passability) {
+    super();
+    this.elevation = elevation;
+    this.terrain = terrain;
+    this.passability = passability;
+  }
+};
+var Demo = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var Passable = class extends CustomType {
+};
+function get_sprite(sprite_sheet2, terrain) {
+  let sprite_key = (() => {
+    if (terrain instanceof Demo) {
+      let variant = terrain[0];
+      return new Ok(get_sprite_key(variant));
+    } else {
+      return new Error(void 0);
+    }
+  })();
+  let _pipe = sprite_key;
+  return try$(
+    _pipe,
+    (_capture) => {
+      return map_get(sprite_sheet2.sprites, _capture);
+    }
+  );
+}
+
+// build/dev/javascript/client/lib/map.mjs
+var Map3 = class extends CustomType {
+  constructor(width, height, sprite_sheet2, tiles) {
+    super();
+    this.width = width;
+    this.height = height;
+    this.sprite_sheet = sprite_sheet2;
+    this.tiles = tiles;
+  }
+};
+function each_tile_loop(loop$tiles, loop$coords, loop$f) {
+  while (true) {
+    let tiles = loop$tiles;
+    let coords = loop$coords;
+    let f = loop$f;
+    if (tiles.hasLength(0)) {
+      return void 0;
+    } else {
+      let tile = tiles.head;
+      let rest = tiles.tail;
+      f(coords, tile);
+      loop$tiles = rest;
+      loop$coords = next(coords);
+      loop$f = f;
+    }
+  }
+}
+function each_tile(map5, f) {
+  return each_tile_loop(map5.tiles, new$3(map5.width, map5.height), f);
+}
+
+// build/dev/javascript/client/lib/engine.mjs
+var GameState = class extends CustomType {
+  constructor(previous_time, accumulator, event_queue, cursor, cursor_animation, fps, map5) {
+    super();
+    this.previous_time = previous_time;
+    this.accumulator = accumulator;
+    this.event_queue = event_queue;
+    this.cursor = cursor;
+    this.cursor_animation = cursor_animation;
+    this.fps = fps;
+    this.map = map5;
+  }
+};
+function new$5(init3, map5) {
+  return new GameState(
+    init3,
+    0,
+    new_queue(),
+    new$4(),
+    new_idle_cursor(),
+    0,
+    map5
+  );
+}
+
+// build/dev/javascript/client/lib/frames.mjs
+var dt_s = 0.01667;
+function to_duration(count) {
+  return multiply(dt_s, count);
+}
+
+// build/dev/javascript/client/lib/map/demo_one.mjs
+function new_tile(variant) {
+  return new Tile(0, new Demo(variant), new Passable());
+}
+function new$6() {
+  return new Map3(
+    8,
+    8,
+    sprite_sheet(),
+    toList([
+      new_tile(new Base()),
+      new_tile(new Variant1()),
+      new_tile(new Variant6()),
+      new_tile(new Base()),
+      new_tile(new Variant4()),
+      new_tile(new Variant5()),
+      new_tile(new Variant2()),
+      new_tile(new Base()),
+      new_tile(new Variant3()),
+      new_tile(new Variant4()),
+      new_tile(new Base()),
+      new_tile(new Variant5()),
+      new_tile(new Variant1()),
+      new_tile(new Base()),
+      new_tile(new Variant6()),
+      new_tile(new Variant2()),
+      new_tile(new Variant2()),
+      new_tile(new Base()),
+      new_tile(new Base()),
+      new_tile(new Variant1()),
+      new_tile(new Base()),
+      new_tile(new Variant3()),
+      new_tile(new Base()),
+      new_tile(new Base()),
+      new_tile(new Variant4()),
+      new_tile(new Base()),
+      new_tile(new Variant1()),
+      new_tile(new Variant3()),
+      new_tile(new Base()),
+      new_tile(new Base()),
+      new_tile(new Base()),
+      new_tile(new Variant2()),
+      new_tile(new Variant3()),
+      new_tile(new Base()),
+      new_tile(new Variant4()),
+      new_tile(new Base()),
+      new_tile(new Variant5()),
+      new_tile(new Base()),
+      new_tile(new Base()),
+      new_tile(new Variant1()),
+      new_tile(new Base()),
+      new_tile(new Variant1()),
+      new_tile(new Base()),
+      new_tile(new Variant3()),
+      new_tile(new Base()),
+      new_tile(new Variant2()),
+      new_tile(new Variant5()),
+      new_tile(new Base()),
+      new_tile(new Variant4()),
+      new_tile(new Variant2()),
+      new_tile(new Base()),
+      new_tile(new Base()),
+      new_tile(new Variant5()),
+      new_tile(new Base()),
+      new_tile(new Variant6()),
+      new_tile(new Base()),
+      new_tile(new Variant6()),
+      new_tile(new Base()),
+      new_tile(new Variant1()),
+      new_tile(new Variant4()),
+      new_tile(new Base()),
+      new_tile(new Base()),
+      new_tile(new Base()),
+      new_tile(new Variant2())
+    ])
+  );
+}
+
 // build/dev/javascript/client/lib/render.mjs
 var RenderContext = class extends CustomType {
   constructor(x0, x1) {
@@ -2189,43 +2634,7 @@ var Ready = class extends CustomType {
     this.game_state = game_state;
   }
 };
-var GameState = class extends CustomType {
-  constructor(previous_time, accumulator, event_queue, cursor, cursor_animation, fps) {
-    super();
-    this.previous_time = previous_time;
-    this.accumulator = accumulator;
-    this.event_queue = event_queue;
-    this.cursor = cursor;
-    this.cursor_animation = cursor_animation;
-    this.fps = fps;
-  }
-};
-var CursorIdle = class extends CustomType {
-  constructor(elapsed, cycle, amplitude) {
-    super();
-    this.elapsed = elapsed;
-    this.cycle = cycle;
-    this.amplitude = amplitude;
-  }
-};
-var CursorMoving = class extends CustomType {
-  constructor(start3, target, elapsed, duration) {
-    super();
-    this.start = start3;
-    this.target = target;
-    this.elapsed = elapsed;
-    this.duration = duration;
-  }
-};
-var Up = class extends CustomType {
-};
-var Down = class extends CustomType {
-};
-var Right = class extends CustomType {
-};
-var Left = class extends CustomType {
-};
-var AppInitCanvas = class extends CustomType {
+var AppInitEngine = class extends CustomType {
   constructor(x0) {
     super();
     this[0] = x0;
@@ -2245,247 +2654,20 @@ var PlayerQueueEvent = class extends CustomType {
     this[0] = x0;
   }
 };
-var MoveCursor = class extends CustomType {
-  constructor(direction) {
-    super();
-    this.direction = direction;
-  }
-};
-function direction_to_vector(direction) {
-  if (direction instanceof Up) {
-    return [0, -1];
-  } else if (direction instanceof Down) {
-    return [0, 1];
-  } else if (direction instanceof Left) {
-    return [-1, 0];
-  } else {
-    return [1, 0];
-  }
-}
-function direction_from_game_key(game_key) {
-  if (game_key instanceof UpKey) {
-    return new Up();
-  } else if (game_key instanceof DownKey) {
-    return new Down();
-  } else if (game_key instanceof LeftKey) {
-    return new Left();
-  } else {
-    return new Right();
-  }
-}
 function setup_listeners() {
   return from(
     (dispatch) => {
       return on_keyboard_event(
         (game_key) => {
-          let direction = direction_from_game_key(game_key);
-          return dispatch(new PlayerQueueEvent(new MoveCursor(direction)));
+          let direction = from_game_key(game_key);
+          return dispatch(
+            new PlayerQueueEvent(new MoveCursor(direction))
+          );
         }
       );
     }
   );
 }
-function reset_events(game_state) {
-  return game_state.withFields({ event_queue: toList([]) });
-}
-function is_gt_or_eq(order) {
-  if (order instanceof Lt) {
-    return false;
-  } else {
-    return true;
-  }
-}
-function schedule_next_frame() {
-  return from(
-    (dispatch) => {
-      return request_animation_frame(
-        (timestamp) => {
-          return dispatch(new Tick(timestamp));
-        }
-      );
-    }
-  );
-}
-function current_animation_vector(start3, target, t) {
-  let sx = start3[0];
-  let sy = start3[1];
-  let tx = target[0];
-  let ty = target[1];
-  return [
-    (() => {
-      let _pipe = sx;
-      return add2(_pipe, multiply(subtract(tx, sx), t));
-    })(),
-    (() => {
-      let _pipe = sy;
-      return add2(_pipe, multiply(subtract(ty, sy), t));
-    })()
-  ];
-}
-function vector_move(s, d) {
-  let sx = s[0];
-  let sy = s[1];
-  let dx = d[0];
-  let dy = d[1];
-  return [add2(sx, dx), add2(sy, dy)];
-}
-function vector_scale(v, scale) {
-  let x = v[0];
-  let y = v[1];
-  return [multiply(x, scale), multiply(y, scale)];
-}
-function render(game_state) {
-  return from(
-    (_) => {
-      return request_animation_frame(
-        (timestamp) => {
-          let $ = with_context();
-          if ($.isOk() && $[0] instanceof RenderContext) {
-            let canvas2 = $[0][0];
-            let context = $[0][1];
-            let $1 = (() => {
-              let $2 = game_state.cursor_animation;
-              if ($2 instanceof CursorIdle) {
-                let elapsed = $2.elapsed;
-                let cycle = $2.cycle;
-                let amplitude = $2.amplitude;
-                let t = (() => {
-                  let _pipe2 = divide(elapsed, cycle);
-                  return unwrap(_pipe2, 0);
-                })();
-                let $3 = (() => {
-                  let _pipe2 = game_state.cursor;
-                  return vector_scale(_pipe2, 10);
-                })();
-                let sx = $3[0];
-                let sy = $3[1];
-                let offset_y = (() => {
-                  let _pipe2 = t;
-                  let _pipe$12 = multiply(_pipe2, 2);
-                  let _pipe$22 = multiply(_pipe$12, pi2());
-                  let _pipe$32 = sin2(_pipe$22);
-                  let _pipe$4 = multiply(_pipe$32, amplitude);
-                  return add2(_pipe$4, sy);
-                })();
-                return vector_move([sx, offset_y], [25, 25]);
-              } else {
-                let start3 = $2.start;
-                let target = $2.target;
-                let elapsed = $2.elapsed;
-                let duration = $2.duration;
-                let t = (() => {
-                  let _pipe3 = divide(elapsed, duration);
-                  return unwrap(_pipe3, 0);
-                })();
-                let _pipe2 = start3;
-                let _pipe$12 = current_animation_vector(_pipe2, target, t);
-                let _pipe$22 = vector_scale(_pipe$12, 10);
-                return vector_move(_pipe$22, [25, 25]);
-              }
-            })();
-            let cursor_x = $1[0];
-            let cursor_y = $1[1];
-            let _pipe = context;
-            let _pipe$1 = clear_rect(
-              _pipe,
-              0,
-              0,
-              1e3,
-              1e3
-            );
-            let _pipe$2 = stroke_rect(
-              _pipe$1,
-              0,
-              0,
-              1e3,
-              1e3
-            );
-            let _pipe$3 = set_fill_style(_pipe$2, "#FA470A");
-            fill_rect(_pipe$3, cursor_x, cursor_y, 50, 50);
-            return void 0;
-          } else {
-            throw makeError(
-              "panic",
-              "client",
-              321,
-              "",
-              "`panic` expression evaluated.",
-              {}
-            );
-          }
-        }
-      );
-    }
-  );
-}
-function update_and_schedule(game_state) {
-  return [
-    new Ready(game_state),
-    batch(toList([render(game_state), schedule_next_frame()]))
-  ];
-}
-function init_canvas() {
-  return from(
-    (dispatch) => {
-      return request_animation_frame(
-        (timestamp) => {
-          let $ = with_context();
-          if ($.isOk() && $[0] instanceof RenderContext) {
-            let context = $[0][1];
-            fill_rect(context, 0, 0, 1e3, 1e3);
-            return dispatch(new AppInitCanvas(timestamp));
-          } else {
-            return dispatch(new AppSetNoCanvas());
-          }
-        }
-      );
-    }
-  );
-}
-function init2(_) {
-  return [new Idle(), init_canvas()];
-}
-function view(_) {
-  return div(
-    toList([]),
-    toList([canvas(toList([id(render_target_id)]))])
-  );
-}
-function frames(count) {
-  return multiply(0.01667, count);
-}
-function apply_events(game_state, events) {
-  let _pipe = fold_right(
-    events,
-    game_state,
-    (acc, event) => {
-      {
-        let direction = event.direction;
-        let $ = game_state.cursor_animation;
-        if ($ instanceof CursorIdle) {
-          let new_cursor = (() => {
-            let _pipe2 = direction;
-            let _pipe$1 = direction_to_vector(_pipe2);
-            return vector_move(_pipe$1, acc.cursor);
-          })();
-          return game_state.withFields({
-            cursor: new_cursor,
-            cursor_animation: new CursorMoving(
-              game_state.cursor,
-              new_cursor,
-              0,
-              frames(6)
-            )
-          });
-        } else {
-          return acc;
-        }
-      }
-    }
-  );
-  return reset_events(_pipe);
-}
-var cursor_idle_info = /* @__PURE__ */ new CursorIdle(0, 0.75, 1);
 function run_logic_update(game_state, dt_seconds) {
   let new_cursor_animation = (() => {
     let $ = game_state.cursor_animation;
@@ -2510,11 +2692,224 @@ function run_logic_update(game_state, dt_seconds) {
       if ($1 instanceof Lt) {
         return new CursorMoving(start3, target, new_elapsed, duration);
       } else {
-        return cursor_idle_info;
+        return new_idle_cursor();
       }
     }
   })();
   return game_state.withFields({ cursor_animation: new_cursor_animation });
+}
+function reset_events(game_state) {
+  return game_state.withFields({ event_queue: toList([]) });
+}
+function apply_events(game_state, events) {
+  let _pipe = fold_right(
+    events,
+    game_state,
+    (acc, event) => {
+      {
+        let direction = event[0];
+        let $ = game_state.cursor_animation;
+        if ($ instanceof CursorIdle) {
+          let new_cursor = (() => {
+            let _pipe2 = direction;
+            let _pipe$1 = from_direction(_pipe2);
+            return move(_pipe$1, acc.cursor);
+          })();
+          return game_state.withFields({
+            cursor: new_cursor,
+            cursor_animation: new CursorMoving(
+              game_state.cursor,
+              new_cursor,
+              0,
+              to_duration(6)
+            )
+          });
+        } else {
+          return acc;
+        }
+      }
+    }
+  );
+  return reset_events(_pipe);
+}
+function is_gt_or_eq(order) {
+  if (order instanceof Lt) {
+    return false;
+  } else {
+    return true;
+  }
+}
+function init_canvas() {
+  return from(
+    (dispatch) => {
+      return request_animation_frame(
+        (timestamp) => {
+          return dispatch(new AppInitEngine(timestamp));
+        }
+      );
+    }
+  );
+}
+function init2(_) {
+  return [new Idle(), init_canvas()];
+}
+function schedule_next_frame() {
+  return from(
+    (dispatch) => {
+      return request_animation_frame(
+        (timestamp) => {
+          return dispatch(new Tick(timestamp));
+        }
+      );
+    }
+  );
+}
+function scale_to_screen(from2) {
+  let _pipe = from2 * 32;
+  return identity(_pipe);
+}
+function render(game_state) {
+  return from(
+    (_) => {
+      return request_animation_frame(
+        (_2) => {
+          let $ = with_context();
+          if ($.isOk() && $[0] instanceof RenderContext) {
+            let canvas2 = $[0][0];
+            let context = $[0][1];
+            let _pipe = canvas2;
+            let _pipe$1 = set_width(_pipe, game_state.map.width);
+            set_height(_pipe$1, game_state.map.height);
+            let _pipe$2 = game_state.map;
+            each_tile(
+              _pipe$2,
+              (coords, tile) => {
+                let sprite_region = (() => {
+                  let _pipe$32 = game_state.map.sprite_sheet;
+                  return get_sprite(_pipe$32, tile.terrain);
+                })();
+                if (sprite_region.isOk()) {
+                  let region = sprite_region[0];
+                  return draw_image_cropped(
+                    context,
+                    game_state.map.sprite_sheet.asset,
+                    (() => {
+                      let _pipe$32 = x3(region);
+                      return scale_to_screen(_pipe$32);
+                    })(),
+                    (() => {
+                      let _pipe$32 = y3(region);
+                      return scale_to_screen(_pipe$32);
+                    })(),
+                    32,
+                    32,
+                    (() => {
+                      let _pipe$32 = x(coords);
+                      return scale_to_screen(_pipe$32);
+                    })(),
+                    (() => {
+                      let _pipe$32 = y(coords);
+                      return scale_to_screen(_pipe$32);
+                    })(),
+                    32,
+                    32
+                  );
+                } else {
+                  return context;
+                }
+              }
+            );
+            let new_cursor = (() => {
+              let $1 = game_state.cursor_animation;
+              if ($1 instanceof CursorIdle) {
+                let elapsed = $1.elapsed;
+                let cycle = $1.cycle;
+                let amplitude = $1.amplitude;
+                let t = (() => {
+                  let _pipe$32 = divide(elapsed, cycle);
+                  return unwrap(_pipe$32, 0);
+                })();
+                let start3 = (() => {
+                  let _pipe$32 = game_state.cursor;
+                  return scale(_pipe$32, 10);
+                })();
+                let offset_y = (() => {
+                  let _pipe$32 = t;
+                  let _pipe$42 = multiply(_pipe$32, 2);
+                  let _pipe$52 = multiply(_pipe$42, pi2());
+                  let _pipe$62 = sin2(_pipe$52);
+                  let _pipe$7 = multiply(_pipe$62, amplitude);
+                  return add2(_pipe$7, y2(start3));
+                })();
+                return move(
+                  at(x2(start3), offset_y),
+                  at(25, 25)
+                );
+              } else {
+                let start3 = $1.start;
+                let target = $1.target;
+                let elapsed = $1.elapsed;
+                let duration = $1.duration;
+                let t = (() => {
+                  let _pipe$33 = divide(elapsed, duration);
+                  return unwrap(_pipe$33, 0);
+                })();
+                let _pipe$32 = start3;
+                let _pipe$42 = interpolate2(_pipe$32, target, t);
+                let _pipe$52 = scale(_pipe$42, 10);
+                return move(_pipe$52, at(25, 25));
+              }
+            })();
+            let _pipe$3 = context;
+            let _pipe$4 = clear_rect(
+              _pipe$3,
+              0,
+              0,
+              1e3,
+              1e3
+            );
+            let _pipe$5 = stroke_rect(
+              _pipe$4,
+              0,
+              0,
+              1e3,
+              1e3
+            );
+            let _pipe$6 = set_fill_style(_pipe$5, "#FA470A");
+            fill_rect(
+              _pipe$6,
+              x2(new_cursor),
+              y2(new_cursor),
+              50,
+              50
+            );
+            return void 0;
+          } else {
+            throw makeError(
+              "panic",
+              "client",
+              330,
+              "",
+              "`panic` expression evaluated.",
+              {}
+            );
+          }
+        }
+      );
+    }
+  );
+}
+function update_and_schedule(game_state) {
+  return [
+    new Ready(game_state),
+    batch(toList([render(game_state), schedule_next_frame()]))
+  ];
+}
+function view(_) {
+  return div(
+    toList([]),
+    toList([canvas(toList([id(render_target_id)]))])
+  );
 }
 var fixed_dt = 16.67;
 function engine_update_loop(loop$game_state, loop$acc) {
@@ -2560,19 +2955,10 @@ function engine_update(game_state, current_time) {
   return engine_update_loop(updated_state, accumulator);
 }
 function update(model, msg) {
-  if (msg instanceof AppInitCanvas) {
+  if (msg instanceof AppInitEngine) {
     let previous_time = msg[0];
     return [
-      new Ready(
-        new GameState(
-          previous_time,
-          0,
-          toList([]),
-          [0, 0],
-          cursor_idle_info,
-          0
-        )
-      ),
+      new Ready(new$5(previous_time, new$6())),
       batch(toList([setup_listeners(), schedule_next_frame()]))
     ];
   } else if (msg instanceof AppSetNoCanvas) {
@@ -2587,7 +2973,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        108,
+        77,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -2609,7 +2995,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        122,
+        91,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -2624,7 +3010,7 @@ function main() {
     throw makeError(
       "let_assert",
       "client",
-      22,
+      35,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }
