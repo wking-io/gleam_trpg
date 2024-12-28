@@ -1,6 +1,7 @@
 // IMPORTS ---------------------------------------------------------------------
 
 import gleam/float
+import gleam/io
 import gleam/list
 import gleam/order.{type Order}
 import gleam/pair
@@ -102,10 +103,7 @@ fn setup_listeners() {
 }
 
 fn update_and_schedule(game_state: engine.GameState) -> #(Model, Effect(Msg)) {
-  #(
-    Ready(game_state),
-    effect.batch([render(game_state), schedule_next_frame()]),
-  )
+  #(Ready(game_state), effect.batch([render(game_state)]))
 }
 
 const fixed_dt = 16.67
@@ -260,9 +258,9 @@ fn view(model: Model) -> Element(Msg) {
 
 fn render(game_state: engine.GameState) -> Effect(Msg) {
   effect.from(fn(_dispatch) {
-    engine.request_animation_frame(fn(_timestamp) {
-      case render.with_context() {
-        Ok(render.RenderContext(_canvas, context)) -> {
+    case render.with_context() {
+      Ok(render.RenderContext(_canvas, context)) -> {
+        engine.request_animation_frame(fn(_timestamp) {
           let viewport =
             camera.get_viewport(game_state.camera, game_state.scale)
           context_impl.clear_rect(
@@ -275,9 +273,10 @@ fn render(game_state: engine.GameState) -> Effect(Msg) {
 
           game_state.map
           |> map.each_tile(fn(coords, tile) {
+            io.debug(coords)
             let sprite_region =
               game_state.map.sprite_sheet
-              |> tile.get_sprite(tile.terrain)
+              |> tile.get_sprite(tile.tileset)
 
             case sprite_region {
               Ok(region) -> {
@@ -288,13 +287,14 @@ fn render(game_state: engine.GameState) -> Effect(Msg) {
                   coord.to_vector(coords),
                   game_state.scale,
                 )
+                Nil
               }
-              _ -> context
+              _ -> Nil
             }
           })
-        }
-        _ -> panic
+        })
       }
-    })
+      _ -> panic
+    }
   })
 }

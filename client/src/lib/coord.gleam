@@ -1,5 +1,5 @@
 import gleam/int
-import lib/math
+import gleam/order
 import lib/vector
 
 const tile_width = 32
@@ -14,41 +14,23 @@ const half_height = 8
 // Space that the coords exist on are a grid
 // that is incremented in single digit Ints
 pub opaque type Coord {
-  Coord(x: Int, y: Int, z: Int, width: Int, height: Int)
+  Coord(x: Int, y: Int, z: Int)
 }
 
-pub fn new(width: Int, height: Int) -> Coord {
-  Coord(0, 0, 0, width, height)
+pub fn new() -> Coord {
+  Coord(0, 0, 0)
+}
+
+pub fn at(x: Int, y: Int, z: Int) -> Coord {
+  Coord(int.max(x, 0), int.max(y, 0), z)
 }
 
 pub fn move(from: Coord, x: Int, y: Int, z: Int) -> Coord {
-  Coord(
-    int.clamp(from.x + x, 0, from.width),
-    int.clamp(from.y + y, 0, from.height),
-    z,
-    from.width,
-    from.height,
-  )
+  Coord(int.max(from.x + x, 0), int.max(from.y + y, 0), z)
 }
 
 pub fn elevate(from: Coord, z: Int) -> Coord {
-  move(from, 0, 0, z)
-}
-
-pub fn next(coord: Coord) -> Coord {
-  case is_bounded_x(coord), is_bounded_y(coord) {
-    True, _ -> Coord(..coord, x: coord.x + 1)
-    _, True -> Coord(..coord, x: 0, y: coord.y + 1)
-    _, _ -> coord
-  }
-}
-
-fn is_bounded_x(coord: Coord) -> Bool {
-  coord.x < coord.width - 1
-}
-
-fn is_bounded_y(coord: Coord) -> Bool {
-  coord.y < coord.height - 1
+  move(from, 0, 0, int.max(z, 0))
 }
 
 pub fn left(coord: Coord) -> Coord {
@@ -88,4 +70,12 @@ pub fn to_vector(coord: Coord) -> vector.Vector {
     screen_x |> int.to_float,
     screen_y |> adjust_by_z(coord) |> int.to_float,
   )
+}
+
+pub fn compare(a: Coord, b: Coord) -> order.Order {
+  int.compare(sum(a), sum(b))
+}
+
+fn sum(coord: Coord) -> Int {
+  coord.x + coord.y * 10
 }

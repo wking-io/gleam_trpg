@@ -77,6 +77,95 @@ var NonEmpty = class extends List {
     this.tail = tail;
   }
 };
+var BitArray = class _BitArray {
+  constructor(buffer) {
+    if (!(buffer instanceof Uint8Array)) {
+      throw "BitArray can only be constructed from a Uint8Array";
+    }
+    this.buffer = buffer;
+  }
+  // @internal
+  get length() {
+    return this.buffer.length;
+  }
+  // @internal
+  byteAt(index2) {
+    return this.buffer[index2];
+  }
+  // @internal
+  floatFromSlice(start3, end, isBigEndian) {
+    return byteArrayToFloat(this.buffer, start3, end, isBigEndian);
+  }
+  // @internal
+  intFromSlice(start3, end, isBigEndian, isSigned) {
+    return byteArrayToInt(this.buffer, start3, end, isBigEndian, isSigned);
+  }
+  // @internal
+  binaryFromSlice(start3, end) {
+    return new _BitArray(this.buffer.slice(start3, end));
+  }
+  // @internal
+  sliceAfter(index2) {
+    return new _BitArray(this.buffer.slice(index2));
+  }
+};
+var UtfCodepoint = class {
+  constructor(value) {
+    this.value = value;
+  }
+};
+function byteArrayToInt(byteArray, start3, end, isBigEndian, isSigned) {
+  const byteSize = end - start3;
+  if (byteSize <= 6) {
+    let value = 0;
+    if (isBigEndian) {
+      for (let i = start3; i < end; i++) {
+        value = value * 256 + byteArray[i];
+      }
+    } else {
+      for (let i = end - 1; i >= start3; i--) {
+        value = value * 256 + byteArray[i];
+      }
+    }
+    if (isSigned) {
+      const highBit = 2 ** (byteSize * 8 - 1);
+      if (value >= highBit) {
+        value -= highBit * 2;
+      }
+    }
+    return value;
+  } else {
+    let value = 0n;
+    if (isBigEndian) {
+      for (let i = start3; i < end; i++) {
+        value = (value << 8n) + BigInt(byteArray[i]);
+      }
+    } else {
+      for (let i = end - 1; i >= start3; i--) {
+        value = (value << 8n) + BigInt(byteArray[i]);
+      }
+    }
+    if (isSigned) {
+      const highBit = 1n << BigInt(byteSize * 8 - 1);
+      if (value >= highBit) {
+        value -= highBit * 2n;
+      }
+    }
+    return Number(value);
+  }
+}
+function byteArrayToFloat(byteArray, start3, end, isBigEndian) {
+  const view2 = new DataView(byteArray.buffer);
+  const byteSize = end - start3;
+  if (byteSize === 8) {
+    return view2.getFloat64(start3, !isBigEndian);
+  } else if (byteSize === 4) {
+    return view2.getFloat32(start3, !isBigEndian);
+  } else {
+    const msg = `Sized floats must be 32-bit or 64-bit on JavaScript, got size of ${byteSize * 8} bits`;
+    throw new globalThis.Error(msg);
+  }
+}
 var Result = class _Result extends CustomType {
   // @internal
   static isResult(data) {
@@ -204,12 +293,17 @@ var None = class extends CustomType {
 };
 
 // build/dev/javascript/gleam_stdlib/gleam/int.mjs
-function min(a, b) {
-  let $ = a < b;
+function compare(a, b) {
+  let $ = a === b;
   if ($) {
-    return a;
+    return new Eq();
   } else {
-    return b;
+    let $1 = a < b;
+    if ($1) {
+      return new Lt();
+    } else {
+      return new Gt();
+    }
   }
 }
 function max(a, b) {
@@ -219,11 +313,6 @@ function max(a, b) {
   } else {
     return b;
   }
-}
-function clamp(x3, min_bound, max_bound) {
-  let _pipe = x3;
-  let _pipe$1 = min(_pipe, max_bound);
-  return max(_pipe$1, min_bound);
 }
 function add(a, b) {
   return a + b;
@@ -300,6 +389,10 @@ function second(pair) {
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/list.mjs
+var Ascending = class extends CustomType {
+};
+var Descending = class extends CustomType {
+};
 function reverse_loop(loop$remaining, loop$accumulator) {
   while (true) {
     let remaining = loop$remaining;
@@ -380,6 +473,344 @@ function index_fold_loop(loop$over, loop$acc, loop$with, loop$index) {
 function index_fold(list, initial, fun) {
   return index_fold_loop(list, initial, fun, 0);
 }
+function sequences(loop$list, loop$compare, loop$growing, loop$direction, loop$prev, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let compare4 = loop$compare;
+    let growing = loop$growing;
+    let direction = loop$direction;
+    let prev = loop$prev;
+    let acc = loop$acc;
+    let growing$1 = prepend(prev, growing);
+    if (list.hasLength(0)) {
+      if (direction instanceof Ascending) {
+        return prepend(reverse_loop(growing$1, toList([])), acc);
+      } else {
+        return prepend(growing$1, acc);
+      }
+    } else {
+      let new$1 = list.head;
+      let rest$1 = list.tail;
+      let $ = compare4(prev, new$1);
+      if ($ instanceof Gt && direction instanceof Descending) {
+        loop$list = rest$1;
+        loop$compare = compare4;
+        loop$growing = growing$1;
+        loop$direction = direction;
+        loop$prev = new$1;
+        loop$acc = acc;
+      } else if ($ instanceof Lt && direction instanceof Ascending) {
+        loop$list = rest$1;
+        loop$compare = compare4;
+        loop$growing = growing$1;
+        loop$direction = direction;
+        loop$prev = new$1;
+        loop$acc = acc;
+      } else if ($ instanceof Eq && direction instanceof Ascending) {
+        loop$list = rest$1;
+        loop$compare = compare4;
+        loop$growing = growing$1;
+        loop$direction = direction;
+        loop$prev = new$1;
+        loop$acc = acc;
+      } else if ($ instanceof Gt && direction instanceof Ascending) {
+        let acc$1 = (() => {
+          if (direction instanceof Ascending) {
+            return prepend(reverse_loop(growing$1, toList([])), acc);
+          } else {
+            return prepend(growing$1, acc);
+          }
+        })();
+        if (rest$1.hasLength(0)) {
+          return prepend(toList([new$1]), acc$1);
+        } else {
+          let next = rest$1.head;
+          let rest$2 = rest$1.tail;
+          let direction$1 = (() => {
+            let $1 = compare4(new$1, next);
+            if ($1 instanceof Lt) {
+              return new Ascending();
+            } else if ($1 instanceof Eq) {
+              return new Ascending();
+            } else {
+              return new Descending();
+            }
+          })();
+          loop$list = rest$2;
+          loop$compare = compare4;
+          loop$growing = toList([new$1]);
+          loop$direction = direction$1;
+          loop$prev = next;
+          loop$acc = acc$1;
+        }
+      } else if ($ instanceof Lt && direction instanceof Descending) {
+        let acc$1 = (() => {
+          if (direction instanceof Ascending) {
+            return prepend(reverse_loop(growing$1, toList([])), acc);
+          } else {
+            return prepend(growing$1, acc);
+          }
+        })();
+        if (rest$1.hasLength(0)) {
+          return prepend(toList([new$1]), acc$1);
+        } else {
+          let next = rest$1.head;
+          let rest$2 = rest$1.tail;
+          let direction$1 = (() => {
+            let $1 = compare4(new$1, next);
+            if ($1 instanceof Lt) {
+              return new Ascending();
+            } else if ($1 instanceof Eq) {
+              return new Ascending();
+            } else {
+              return new Descending();
+            }
+          })();
+          loop$list = rest$2;
+          loop$compare = compare4;
+          loop$growing = toList([new$1]);
+          loop$direction = direction$1;
+          loop$prev = next;
+          loop$acc = acc$1;
+        }
+      } else {
+        let acc$1 = (() => {
+          if (direction instanceof Ascending) {
+            return prepend(reverse_loop(growing$1, toList([])), acc);
+          } else {
+            return prepend(growing$1, acc);
+          }
+        })();
+        if (rest$1.hasLength(0)) {
+          return prepend(toList([new$1]), acc$1);
+        } else {
+          let next = rest$1.head;
+          let rest$2 = rest$1.tail;
+          let direction$1 = (() => {
+            let $1 = compare4(new$1, next);
+            if ($1 instanceof Lt) {
+              return new Ascending();
+            } else if ($1 instanceof Eq) {
+              return new Ascending();
+            } else {
+              return new Descending();
+            }
+          })();
+          loop$list = rest$2;
+          loop$compare = compare4;
+          loop$growing = toList([new$1]);
+          loop$direction = direction$1;
+          loop$prev = next;
+          loop$acc = acc$1;
+        }
+      }
+    }
+  }
+}
+function merge_ascendings(loop$list1, loop$list2, loop$compare, loop$acc) {
+  while (true) {
+    let list1 = loop$list1;
+    let list2 = loop$list2;
+    let compare4 = loop$compare;
+    let acc = loop$acc;
+    if (list1.hasLength(0)) {
+      let list = list2;
+      return reverse_loop(list, acc);
+    } else if (list2.hasLength(0)) {
+      let list = list1;
+      return reverse_loop(list, acc);
+    } else {
+      let first1 = list1.head;
+      let rest1 = list1.tail;
+      let first22 = list2.head;
+      let rest2 = list2.tail;
+      let $ = compare4(first1, first22);
+      if ($ instanceof Lt) {
+        loop$list1 = rest1;
+        loop$list2 = list2;
+        loop$compare = compare4;
+        loop$acc = prepend(first1, acc);
+      } else if ($ instanceof Gt) {
+        loop$list1 = list1;
+        loop$list2 = rest2;
+        loop$compare = compare4;
+        loop$acc = prepend(first22, acc);
+      } else {
+        loop$list1 = list1;
+        loop$list2 = rest2;
+        loop$compare = compare4;
+        loop$acc = prepend(first22, acc);
+      }
+    }
+  }
+}
+function merge_ascending_pairs(loop$sequences, loop$compare, loop$acc) {
+  while (true) {
+    let sequences2 = loop$sequences;
+    let compare4 = loop$compare;
+    let acc = loop$acc;
+    if (sequences2.hasLength(0)) {
+      return reverse_loop(acc, toList([]));
+    } else if (sequences2.hasLength(1)) {
+      let sequence = sequences2.head;
+      return reverse_loop(
+        prepend(reverse_loop(sequence, toList([])), acc),
+        toList([])
+      );
+    } else {
+      let ascending1 = sequences2.head;
+      let ascending2 = sequences2.tail.head;
+      let rest$1 = sequences2.tail.tail;
+      let descending = merge_ascendings(
+        ascending1,
+        ascending2,
+        compare4,
+        toList([])
+      );
+      loop$sequences = rest$1;
+      loop$compare = compare4;
+      loop$acc = prepend(descending, acc);
+    }
+  }
+}
+function merge_descendings(loop$list1, loop$list2, loop$compare, loop$acc) {
+  while (true) {
+    let list1 = loop$list1;
+    let list2 = loop$list2;
+    let compare4 = loop$compare;
+    let acc = loop$acc;
+    if (list1.hasLength(0)) {
+      let list = list2;
+      return reverse_loop(list, acc);
+    } else if (list2.hasLength(0)) {
+      let list = list1;
+      return reverse_loop(list, acc);
+    } else {
+      let first1 = list1.head;
+      let rest1 = list1.tail;
+      let first22 = list2.head;
+      let rest2 = list2.tail;
+      let $ = compare4(first1, first22);
+      if ($ instanceof Lt) {
+        loop$list1 = list1;
+        loop$list2 = rest2;
+        loop$compare = compare4;
+        loop$acc = prepend(first22, acc);
+      } else if ($ instanceof Gt) {
+        loop$list1 = rest1;
+        loop$list2 = list2;
+        loop$compare = compare4;
+        loop$acc = prepend(first1, acc);
+      } else {
+        loop$list1 = rest1;
+        loop$list2 = list2;
+        loop$compare = compare4;
+        loop$acc = prepend(first1, acc);
+      }
+    }
+  }
+}
+function merge_descending_pairs(loop$sequences, loop$compare, loop$acc) {
+  while (true) {
+    let sequences2 = loop$sequences;
+    let compare4 = loop$compare;
+    let acc = loop$acc;
+    if (sequences2.hasLength(0)) {
+      return reverse_loop(acc, toList([]));
+    } else if (sequences2.hasLength(1)) {
+      let sequence = sequences2.head;
+      return reverse_loop(
+        prepend(reverse_loop(sequence, toList([])), acc),
+        toList([])
+      );
+    } else {
+      let descending1 = sequences2.head;
+      let descending2 = sequences2.tail.head;
+      let rest$1 = sequences2.tail.tail;
+      let ascending = merge_descendings(
+        descending1,
+        descending2,
+        compare4,
+        toList([])
+      );
+      loop$sequences = rest$1;
+      loop$compare = compare4;
+      loop$acc = prepend(ascending, acc);
+    }
+  }
+}
+function merge_all(loop$sequences, loop$direction, loop$compare) {
+  while (true) {
+    let sequences2 = loop$sequences;
+    let direction = loop$direction;
+    let compare4 = loop$compare;
+    if (sequences2.hasLength(0)) {
+      return toList([]);
+    } else if (sequences2.hasLength(1) && direction instanceof Ascending) {
+      let sequence = sequences2.head;
+      return sequence;
+    } else if (sequences2.hasLength(1) && direction instanceof Descending) {
+      let sequence = sequences2.head;
+      return reverse_loop(sequence, toList([]));
+    } else if (direction instanceof Ascending) {
+      let sequences$1 = merge_ascending_pairs(sequences2, compare4, toList([]));
+      loop$sequences = sequences$1;
+      loop$direction = new Descending();
+      loop$compare = compare4;
+    } else {
+      let sequences$1 = merge_descending_pairs(sequences2, compare4, toList([]));
+      loop$sequences = sequences$1;
+      loop$direction = new Ascending();
+      loop$compare = compare4;
+    }
+  }
+}
+function sort(list, compare4) {
+  if (list.hasLength(0)) {
+    return toList([]);
+  } else if (list.hasLength(1)) {
+    let x3 = list.head;
+    return toList([x3]);
+  } else {
+    let x3 = list.head;
+    let y3 = list.tail.head;
+    let rest$1 = list.tail.tail;
+    let direction = (() => {
+      let $ = compare4(x3, y3);
+      if ($ instanceof Lt) {
+        return new Ascending();
+      } else if ($ instanceof Eq) {
+        return new Ascending();
+      } else {
+        return new Descending();
+      }
+    })();
+    let sequences$1 = sequences(
+      rest$1,
+      compare4,
+      toList([x3]),
+      direction,
+      y3,
+      toList([])
+    );
+    return merge_all(sequences$1, new Ascending(), compare4);
+  }
+}
+function each(loop$list, loop$f) {
+  while (true) {
+    let list = loop$list;
+    let f = loop$f;
+    if (list.hasLength(0)) {
+      return void 0;
+    } else {
+      let first$1 = list.head;
+      let rest$1 = list.tail;
+      f(first$1);
+      loop$list = rest$1;
+      loop$f = f;
+    }
+  }
+}
 
 // build/dev/javascript/gleam_stdlib/gleam/string.mjs
 function drop_start(loop$string, loop$num_graphemes) {
@@ -400,6 +831,10 @@ function drop_start(loop$string, loop$num_graphemes) {
       }
     }
   }
+}
+function inspect2(term) {
+  let _pipe = inspect(term);
+  return identity(_pipe);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/result.mjs
@@ -557,21 +992,21 @@ function bitcount(x3) {
 function index(bitmap, bit) {
   return bitcount(bitmap & bit - 1);
 }
-function cloneAndSet(arr, at2, val) {
+function cloneAndSet(arr, at3, val) {
   const len = arr.length;
   const out = new Array(len);
   for (let i = 0; i < len; ++i) {
     out[i] = arr[i];
   }
-  out[at2] = val;
+  out[at3] = val;
   return out;
 }
-function spliceIn(arr, at2, val) {
+function spliceIn(arr, at3, val) {
   const len = arr.length;
   const out = new Array(len + 1);
   let i = 0;
   let g = 0;
-  while (i < at2) {
+  while (i < at3) {
     out[g++] = arr[i++];
   }
   out[g++] = val;
@@ -580,12 +1015,12 @@ function spliceIn(arr, at2, val) {
   }
   return out;
 }
-function spliceOut(arr, at2) {
+function spliceOut(arr, at3) {
   const len = arr.length;
   const out = new Array(len - 1);
   let i = 0;
   let g = 0;
-  while (i < at2) {
+  while (i < at3) {
     out[g++] = arr[i++];
   }
   ++i;
@@ -1136,6 +1571,19 @@ function identity(x3) {
 function to_string(term) {
   return term.toString();
 }
+function float_to_string(float2) {
+  const string2 = float2.toString().replace("+", "");
+  if (string2.indexOf(".") >= 0) {
+    return string2;
+  } else {
+    const index2 = string2.indexOf("e");
+    if (index2 >= 0) {
+      return string2.slice(0, index2) + ".0" + string2.slice(index2);
+    } else {
+      return string2 + ".0";
+    }
+  }
+}
 var segmenter = void 0;
 function graphemes_iterator(string2) {
   if (globalThis.Intl && Intl.Segmenter) {
@@ -1179,6 +1627,15 @@ var unicode_whitespaces = [
 ].join("");
 var trim_start_regex = new RegExp(`^[${unicode_whitespaces}]*`);
 var trim_end_regex = new RegExp(`[${unicode_whitespaces}]*$`);
+function print_debug(string2) {
+  if (typeof process === "object" && process.stderr?.write) {
+    process.stderr.write(string2 + "\n");
+  } else if (typeof Deno === "object") {
+    Deno.stderr.writeSync(new TextEncoder().encode(string2 + "\n"));
+  } else {
+    console.log(string2);
+  }
+}
 function floor(float2) {
   return Math.floor(float2);
 }
@@ -1198,9 +1655,122 @@ function map_get(map4, key) {
 function map_insert(key, value, map4) {
   return map4.set(key, value);
 }
+function inspect(v) {
+  const t = typeof v;
+  if (v === true)
+    return "True";
+  if (v === false)
+    return "False";
+  if (v === null)
+    return "//js(null)";
+  if (v === void 0)
+    return "Nil";
+  if (t === "string")
+    return inspectString(v);
+  if (t === "bigint" || Number.isInteger(v))
+    return v.toString();
+  if (t === "number")
+    return float_to_string(v);
+  if (Array.isArray(v))
+    return `#(${v.map(inspect).join(", ")})`;
+  if (v instanceof List)
+    return inspectList(v);
+  if (v instanceof UtfCodepoint)
+    return inspectUtfCodepoint(v);
+  if (v instanceof BitArray)
+    return inspectBitArray(v);
+  if (v instanceof CustomType)
+    return inspectCustomType(v);
+  if (v instanceof Dict)
+    return inspectDict(v);
+  if (v instanceof Set)
+    return `//js(Set(${[...v].map(inspect).join(", ")}))`;
+  if (v instanceof RegExp)
+    return `//js(${v})`;
+  if (v instanceof Date)
+    return `//js(Date("${v.toISOString()}"))`;
+  if (v instanceof Function) {
+    const args = [];
+    for (const i of Array(v.length).keys())
+      args.push(String.fromCharCode(i + 97));
+    return `//fn(${args.join(", ")}) { ... }`;
+  }
+  return inspectObject(v);
+}
+function inspectString(str) {
+  let new_str = '"';
+  for (let i = 0; i < str.length; i++) {
+    let char = str[i];
+    switch (char) {
+      case "\n":
+        new_str += "\\n";
+        break;
+      case "\r":
+        new_str += "\\r";
+        break;
+      case "	":
+        new_str += "\\t";
+        break;
+      case "\f":
+        new_str += "\\f";
+        break;
+      case "\\":
+        new_str += "\\\\";
+        break;
+      case '"':
+        new_str += '\\"';
+        break;
+      default:
+        if (char < " " || char > "~" && char < "\xA0") {
+          new_str += "\\u{" + char.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0") + "}";
+        } else {
+          new_str += char;
+        }
+    }
+  }
+  new_str += '"';
+  return new_str;
+}
+function inspectDict(map4) {
+  let body = "dict.from_list([";
+  let first3 = true;
+  map4.forEach((value, key) => {
+    if (!first3)
+      body = body + ", ";
+    body = body + "#(" + inspect(key) + ", " + inspect(value) + ")";
+    first3 = false;
+  });
+  return body + "])";
+}
+function inspectObject(v) {
+  const name = Object.getPrototypeOf(v)?.constructor?.name || "Object";
+  const props = [];
+  for (const k of Object.keys(v)) {
+    props.push(`${inspect(k)}: ${inspect(v[k])}`);
+  }
+  const body = props.length ? " " + props.join(", ") + " " : "";
+  const head = name === "Object" ? "" : name + " ";
+  return `//js(${head}{${body}})`;
+}
+function inspectCustomType(record) {
+  const props = Object.keys(record).map((label) => {
+    const value = inspect(record[label]);
+    return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
+  }).join(", ");
+  return props ? `${record.constructor.name}(${props})` : record.constructor.name;
+}
+function inspectList(list) {
+  return `[${list.toArray().map(inspect).join(", ")}]`;
+}
+function inspectBitArray(bits) {
+  return `<<${Array.from(bits.buffer).join(", ")}>>`;
+}
+function inspectUtfCodepoint(codepoint2) {
+  return `//utfcodepoint(${String.fromCodePoint(codepoint2.value)})`;
+}
 
 // build/dev/javascript/gleam_stdlib/gleam/float.mjs
-function compare(a, b) {
+function compare2(a, b) {
   let $ = a === b;
   if ($) {
     return new Eq();
@@ -1236,6 +1806,14 @@ function multiply2(a, b) {
 }
 function subtract2(a, b) {
   return a - b;
+}
+
+// build/dev/javascript/gleam_stdlib/gleam/io.mjs
+function debug(term) {
+  let _pipe = term;
+  let _pipe$1 = inspect2(_pipe);
+  print_debug(_pipe$1);
+  return term;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/bool.mjs
@@ -1552,31 +2130,31 @@ if (globalThis.customElements && !globalThis.customElements.get("lustre-fragment
     }
   );
 }
-function morph(prev, next2, dispatch) {
+function morph(prev, next, dispatch) {
   let out;
-  let stack = [{ prev, next: next2, parent: prev.parentNode }];
+  let stack = [{ prev, next, parent: prev.parentNode }];
   while (stack.length) {
-    let { prev: prev2, next: next3, parent } = stack.pop();
-    while (next3.subtree !== void 0)
-      next3 = next3.subtree();
-    if (next3.content !== void 0) {
+    let { prev: prev2, next: next2, parent } = stack.pop();
+    while (next2.subtree !== void 0)
+      next2 = next2.subtree();
+    if (next2.content !== void 0) {
       if (!prev2) {
-        const created = document.createTextNode(next3.content);
+        const created = document.createTextNode(next2.content);
         parent.appendChild(created);
         out ??= created;
       } else if (prev2.nodeType === Node.TEXT_NODE) {
-        if (prev2.textContent !== next3.content)
-          prev2.textContent = next3.content;
+        if (prev2.textContent !== next2.content)
+          prev2.textContent = next2.content;
         out ??= prev2;
       } else {
-        const created = document.createTextNode(next3.content);
+        const created = document.createTextNode(next2.content);
         parent.replaceChild(created, prev2);
         out ??= created;
       }
-    } else if (next3.tag !== void 0) {
+    } else if (next2.tag !== void 0) {
       const created = createElementNode({
         prev: prev2,
-        next: next3,
+        next: next2,
         dispatch,
         stack
       });
@@ -1590,10 +2168,10 @@ function morph(prev, next2, dispatch) {
   }
   return out;
 }
-function createElementNode({ prev, next: next2, dispatch, stack }) {
-  const namespace = next2.namespace || "http://www.w3.org/1999/xhtml";
-  const canMorph = prev && prev.nodeType === Node.ELEMENT_NODE && prev.localName === next2.tag && prev.namespaceURI === (next2.namespace || "http://www.w3.org/1999/xhtml");
-  const el = canMorph ? prev : namespace ? document.createElementNS(namespace, next2.tag) : document.createElement(next2.tag);
+function createElementNode({ prev, next, dispatch, stack }) {
+  const namespace = next.namespace || "http://www.w3.org/1999/xhtml";
+  const canMorph = prev && prev.nodeType === Node.ELEMENT_NODE && prev.localName === next.tag && prev.namespaceURI === (next.namespace || "http://www.w3.org/1999/xhtml");
+  const el = canMorph ? prev : namespace ? document.createElementNS(namespace, next.tag) : document.createElement(next.tag);
   let handlersForEl;
   if (!registeredHandlers.has(el)) {
     const emptyHandlers = /* @__PURE__ */ new Map();
@@ -1607,13 +2185,13 @@ function createElementNode({ prev, next: next2, dispatch, stack }) {
   let className = null;
   let style2 = null;
   let innerHTML = null;
-  if (canMorph && next2.tag === "textarea") {
-    const innertText = next2.children[Symbol.iterator]().next().value?.content;
+  if (canMorph && next.tag === "textarea") {
+    const innertText = next.children[Symbol.iterator]().next().value?.content;
     if (innertText !== void 0)
       el.value = innertText;
   }
   const delegated = [];
-  for (const attr of next2.attrs) {
+  for (const attr of next.attrs) {
     const name = attr[0];
     const value = attr[1];
     if (attr.as_property) {
@@ -1679,7 +2257,7 @@ function createElementNode({ prev, next: next2, dispatch, stack }) {
       el.removeEventListener(eventName, lustreGenericEventHandler);
     }
   }
-  if (next2.tag === "slot") {
+  if (next.tag === "slot") {
     window.queueMicrotask(() => {
       for (const child of el.assignedElements()) {
         for (const [name, value] of delegated) {
@@ -1690,8 +2268,8 @@ function createElementNode({ prev, next: next2, dispatch, stack }) {
       }
     });
   }
-  if (next2.key !== void 0 && next2.key !== "") {
-    el.setAttribute("data-lustre-key", next2.key);
+  if (next.key !== void 0 && next.key !== "") {
+    el.setAttribute("data-lustre-key", next.key);
   } else if (innerHTML !== null) {
     el.innerHTML = innerHTML;
     return el;
@@ -1700,14 +2278,14 @@ function createElementNode({ prev, next: next2, dispatch, stack }) {
   let seenKeys = null;
   let keyedChildren = null;
   let incomingKeyedChildren = null;
-  let firstChild = children(next2).next().value;
+  let firstChild = children(next).next().value;
   if (canMorph && firstChild !== void 0 && // Explicit checks are more verbose but truthy checks force a bunch of comparisons
   // we don't care about: it's never gonna be a number etc.
   firstChild.key !== void 0 && firstChild.key !== "") {
     seenKeys = /* @__PURE__ */ new Set();
     keyedChildren = getKeyedChildren(prev);
-    incomingKeyedChildren = getKeyedChildren(next2);
-    for (const child of children(next2)) {
+    incomingKeyedChildren = getKeyedChildren(next);
+    for (const child of children(next)) {
       prevChild = diffKeyedChild(
         prevChild,
         child,
@@ -1719,15 +2297,15 @@ function createElementNode({ prev, next: next2, dispatch, stack }) {
       );
     }
   } else {
-    for (const child of children(next2)) {
+    for (const child of children(next)) {
       stack.unshift({ prev: prevChild, next: child, parent: el });
       prevChild = prevChild?.nextSibling;
     }
   }
   while (prevChild) {
-    const next3 = prevChild.nextSibling;
+    const next2 = prevChild.nextSibling;
     el.removeChild(prevChild);
-    prevChild = next3;
+    prevChild = next2;
   }
   return el;
 }
@@ -1960,9 +2538,9 @@ var LustreClientApplication = class _LustreClientApplication {
   #flush(effects = []) {
     while (this.#queue.length > 0) {
       const msg = this.#queue.shift();
-      const [next2, effect] = this.#update(this.#model, msg);
+      const [next, effect] = this.#update(this.#model, msg);
       effects = effects.concat(effect.all.toArray());
-      this.#model = next2;
+      this.#model = next;
     }
     while (effects.length > 0) {
       const effect = effects.shift();
@@ -2071,9 +2649,9 @@ var LustreServerApplication = class _LustreServerApplication {
   #flush(effects = []) {
     while (this.#queue.length > 0) {
       const msg = this.#queue.shift();
-      const [next2, effect] = this.#update(this.#model, msg);
+      const [next, effect] = this.#update(this.#model, msg);
       effects = effects.concat(effect.all.toArray());
-      this.#model = next2;
+      this.#model = next;
     }
     while (effects.length > 0) {
       const effect = effects.shift();
@@ -2349,46 +2927,21 @@ function from_direction(direction) {
 
 // build/dev/javascript/client/lib/coord.mjs
 var Coord = class extends CustomType {
-  constructor(x3, y3, z, width3, height3) {
+  constructor(x3, y3, z) {
     super();
     this.x = x3;
     this.y = y3;
     this.z = z;
-    this.width = width3;
-    this.height = height3;
   }
 };
-function new$5(width3, height3) {
-  return new Coord(0, 0, 0, width3, height3);
+function at2(x3, y3, z) {
+  return new Coord(max(x3, 0), max(y3, 0), z);
 }
-function move2(from2, x3, y3, z) {
-  return new Coord(
-    clamp(from2.x + x3, 0, from2.width),
-    clamp(from2.y + y3, 0, from2.height),
-    z,
-    from2.width,
-    from2.height
-  );
+function sum(coord) {
+  return coord.x + coord.y * 10;
 }
-function elevate(from2, z) {
-  return move2(from2, 0, 0, z);
-}
-function is_bounded_x(coord) {
-  return coord.x < coord.width - 1;
-}
-function is_bounded_y(coord) {
-  return coord.y < coord.height - 1;
-}
-function next(coord) {
-  let $ = is_bounded_x(coord);
-  let $1 = is_bounded_y(coord);
-  if ($) {
-    return coord.withFields({ x: coord.x + 1 });
-  } else if ($1) {
-    return coord.withFields({ x: 0, y: coord.y + 1 });
-  } else {
-    return coord;
-  }
+function compare3(a, b) {
+  return compare(sum(a), sum(b));
 }
 var half_width = 16;
 var tile_height = 16;
@@ -2471,7 +3024,7 @@ function x2(sr, grid) {
 function y2(sr, grid) {
   return sr.y * grid;
 }
-function render(context, sheet, sprite_region, at2, scale2) {
+function render(context, sheet, sprite_region, at3, scale2) {
   return draw_image_cropped(
     context,
     sheet.asset,
@@ -2486,11 +3039,11 @@ function render(context, sheet, sprite_region, at2, scale2) {
     32,
     32,
     (() => {
-      let _pipe = x(at2);
+      let _pipe = x(at3);
       return scale(_pipe, scale2);
     })(),
     (() => {
-      let _pipe = y(at2);
+      let _pipe = y(at3);
       return scale(_pipe, scale2);
     })(),
     (() => {
@@ -2557,10 +3110,9 @@ function sprite_sheet() {
 
 // build/dev/javascript/client/lib/tile.mjs
 var Tile = class extends CustomType {
-  constructor(elevation, terrain, passability) {
+  constructor(tileset, passability) {
     super();
-    this.elevation = elevation;
-    this.terrain = terrain;
+    this.tileset = tileset;
     this.passability = passability;
   }
 };
@@ -2572,10 +3124,10 @@ var Demo = class extends CustomType {
 };
 var Passable = class extends CustomType {
 };
-function get_sprite(sprite_sheet2, terrain) {
+function get_sprite(sprite_sheet2, tileset) {
   let sprite_key = (() => {
-    if (terrain instanceof Demo) {
-      let variant = terrain[0];
+    if (tileset instanceof Demo) {
+      let variant = tileset[0];
       return new Ok(get_sprite_key(variant));
     } else {
       return new Error(void 0);
@@ -2592,33 +3144,29 @@ function get_sprite(sprite_sheet2, terrain) {
 
 // build/dev/javascript/client/lib/map.mjs
 var Map3 = class extends CustomType {
-  constructor(width3, height3, sprite_sheet2, tiles) {
+  constructor(sprite_sheet2, tiles) {
     super();
-    this.width = width3;
-    this.height = height3;
     this.sprite_sheet = sprite_sheet2;
     this.tiles = tiles;
   }
 };
-function each_tile_loop(loop$tiles, loop$coords, loop$f) {
-  while (true) {
-    let tiles = loop$tiles;
-    let coords = loop$coords;
-    let f = loop$f;
-    if (tiles.hasLength(0)) {
-      return void 0;
-    } else {
-      let tile = tiles.head;
-      let rest = tiles.tail;
-      f(elevate(coords, tile.elevation), tile);
-      loop$tiles = rest;
-      loop$coords = next(coords);
-      loop$f = f;
-    }
-  }
-}
 function each_tile(map4, f) {
-  return each_tile_loop(map4.tiles, new$5(map4.width, map4.height), f);
+  let _pipe = map4.tiles;
+  let _pipe$1 = map_to_list(_pipe);
+  let _pipe$2 = sort(
+    _pipe$1,
+    (a, b) => {
+      return compare3(first(a), first(b));
+    }
+  );
+  return each(
+    _pipe$2,
+    (tile_pair) => {
+      let coords = first(tile_pair);
+      let tile = second(tile_pair);
+      return f(coords, tile);
+    }
+  );
 }
 
 // build/dev/javascript/client/lib/engine.mjs
@@ -2636,7 +3184,7 @@ var GameState = class extends CustomType {
     this.scale = scale2;
   }
 };
-function new$6(init3, map4) {
+function new$5(init3, map4) {
   return new GameState(
     0,
     new$3(),
@@ -2657,85 +3205,79 @@ function to_duration(count) {
 }
 
 // build/dev/javascript/client/lib/map/demo_one.mjs
-function new_tile(variant, elevation) {
-  return new Tile(
-    elevation,
-    new Demo(variant),
-    new Passable()
-  );
+function new_tile(variant) {
+  return new Tile(new Demo(variant), new Passable());
 }
-function new$7() {
-  return new Map3(
-    8,
-    8,
-    sprite_sheet(),
+function new$6() {
+  let tiles = from_list(
     toList([
-      new_tile(new Base(), 0),
-      new_tile(new Variant1(), 0),
-      new_tile(new Variant6(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant4(), 0),
-      new_tile(new Variant5(), 0),
-      new_tile(new Variant2(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant3(), 0),
-      new_tile(new Variant4(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant5(), 0),
-      new_tile(new Variant1(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant6(), 0),
-      new_tile(new Variant2(), 0),
-      new_tile(new Variant2(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Base(), 1),
-      new_tile(new Variant1(), 1),
-      new_tile(new Variant1(), 1),
-      new_tile(new Base(), 1),
-      new_tile(new Variant3(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant4(), 0),
-      new_tile(new Base(), 1),
-      new_tile(new Variant1(), 2),
-      new_tile(new Variant3(), 2),
-      new_tile(new Base(), 1),
-      new_tile(new Base(), 0),
-      new_tile(new Variant2(), 0),
-      new_tile(new Variant3(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant4(), 1),
-      new_tile(new Base(), 2),
-      new_tile(new Variant5(), 2),
-      new_tile(new Base(), 1),
-      new_tile(new Base(), 0),
-      new_tile(new Variant1(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant1(), 0),
-      new_tile(new Base(), 1),
-      new_tile(new Variant3(), 1),
-      new_tile(new Base(), 1),
-      new_tile(new Variant2(), 1),
-      new_tile(new Variant5(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant4(), 0),
-      new_tile(new Variant2(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant5(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant6(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant6(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant1(), 0),
-      new_tile(new Variant4(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Base(), 0),
-      new_tile(new Variant2(), 0)
+      [at2(0, 0, 0), new_tile(new Base())],
+      [at2(1, 0, 0), new_tile(new Variant1())],
+      [at2(2, 0, 0), new_tile(new Variant6())],
+      [at2(3, 0, 0), new_tile(new Base())],
+      [at2(4, 0, 0), new_tile(new Variant4())],
+      [at2(5, 0, 0), new_tile(new Variant5())],
+      [at2(6, 0, 0), new_tile(new Variant2())],
+      [at2(7, 0, 0), new_tile(new Base())],
+      [at2(0, 1, 0), new_tile(new Variant3())],
+      [at2(1, 1, 0), new_tile(new Variant4())],
+      [at2(2, 1, 0), new_tile(new Base())],
+      [at2(3, 1, 0), new_tile(new Variant5())],
+      [at2(4, 1, 0), new_tile(new Variant1())],
+      [at2(5, 1, 0), new_tile(new Base())],
+      [at2(6, 1, 0), new_tile(new Variant6())],
+      [at2(7, 1, 0), new_tile(new Variant2())],
+      [at2(0, 2, 0), new_tile(new Variant2())],
+      [at2(1, 2, 0), new_tile(new Base())],
+      [at2(2, 2, 0), new_tile(new Base())],
+      [at2(3, 2, 0), new_tile(new Variant1())],
+      [at2(4, 2, 0), new_tile(new Variant1())],
+      [at2(5, 2, 0), new_tile(new Base())],
+      [at2(6, 2, 0), new_tile(new Variant3())],
+      [at2(7, 2, 0), new_tile(new Base())],
+      [at2(0, 3, 0), new_tile(new Base())],
+      [at2(1, 3, 0), new_tile(new Variant4())],
+      [at2(2, 3, 0), new_tile(new Base())],
+      [at2(3, 3, 2), new_tile(new Variant1())],
+      [at2(4, 3, 2), new_tile(new Variant3())],
+      [at2(5, 3, 0), new_tile(new Base())],
+      [at2(6, 3, 0), new_tile(new Base())],
+      [at2(7, 3, 0), new_tile(new Variant2())],
+      [at2(0, 4, 0), new_tile(new Variant3())],
+      [at2(1, 4, 0), new_tile(new Base())],
+      [at2(2, 4, 0), new_tile(new Variant4())],
+      [at2(3, 4, 2), new_tile(new Base())],
+      [at2(4, 4, 2), new_tile(new Variant5())],
+      [at2(5, 4, 0), new_tile(new Base())],
+      [at2(6, 4, 0), new_tile(new Base())],
+      [at2(7, 4, 0), new_tile(new Variant1())],
+      [at2(0, 5, 0), new_tile(new Base())],
+      [at2(1, 5, 0), new_tile(new Variant1())],
+      [at2(2, 5, 0), new_tile(new Base())],
+      [at2(3, 5, 0), new_tile(new Variant3())],
+      [at2(4, 5, 0), new_tile(new Base())],
+      [at2(5, 5, 0), new_tile(new Variant2())],
+      [at2(6, 5, 0), new_tile(new Variant5())],
+      [at2(7, 5, 0), new_tile(new Base())],
+      [at2(0, 6, 0), new_tile(new Variant4())],
+      [at2(1, 6, 0), new_tile(new Variant2())],
+      [at2(2, 6, 0), new_tile(new Base())],
+      [at2(3, 6, 0), new_tile(new Base())],
+      [at2(4, 6, 0), new_tile(new Variant5())],
+      [at2(5, 6, 0), new_tile(new Base())],
+      [at2(6, 6, 0), new_tile(new Variant6())],
+      [at2(7, 6, 0), new_tile(new Base())],
+      [at2(0, 7, 0), new_tile(new Variant6())],
+      [at2(1, 7, 0), new_tile(new Base())],
+      [at2(2, 7, 0), new_tile(new Variant1())],
+      [at2(3, 7, 0), new_tile(new Variant4())],
+      [at2(4, 7, 0), new_tile(new Base())],
+      [at2(5, 7, 0), new_tile(new Base())],
+      [at2(6, 7, 0), new_tile(new Base())],
+      [at2(7, 7, 0), new_tile(new Variant2())]
     ])
   );
+  return new Map3(sprite_sheet(), tiles);
 }
 
 // build/dev/javascript/client/lib/render.mjs
@@ -2824,7 +3366,7 @@ function run_logic_update(game_state, dt_seconds) {
       let elapsed = $.elapsed;
       let duration = $.duration;
       let new_elapsed = add3(elapsed, dt_seconds);
-      let $1 = compare(new_elapsed, duration);
+      let $1 = compare2(new_elapsed, duration);
       if ($1 instanceof Lt) {
         return new CursorMoving(start3, target, new_elapsed, duration);
       } else {
@@ -2903,11 +3445,11 @@ function schedule_next_frame() {
 function render2(game_state) {
   return from(
     (_) => {
-      return request_animation_frame(
-        (_2) => {
-          let $ = with_context();
-          if ($.isOk() && $[0] instanceof RenderContext) {
-            let context = $[0][1];
+      let $ = with_context();
+      if ($.isOk() && $[0] instanceof RenderContext) {
+        let context = $[0][1];
+        return request_animation_frame(
+          (_2) => {
             let viewport = get_viewport(
               game_state.camera,
               game_state.scale
@@ -2923,44 +3465,43 @@ function render2(game_state) {
             return each_tile(
               _pipe,
               (coords, tile) => {
+                debug(coords);
                 let sprite_region = (() => {
                   let _pipe$1 = game_state.map.sprite_sheet;
-                  return get_sprite(_pipe$1, tile.terrain);
+                  return get_sprite(_pipe$1, tile.tileset);
                 })();
                 if (sprite_region.isOk()) {
                   let region = sprite_region[0];
-                  return render(
+                  render(
                     context,
                     game_state.map.sprite_sheet,
                     region,
                     to_vector(coords),
                     game_state.scale
                   );
+                  return void 0;
                 } else {
-                  return context;
+                  return void 0;
                 }
               }
             );
-          } else {
-            throw makeError(
-              "panic",
-              "client",
-              296,
-              "",
-              "`panic` expression evaluated.",
-              {}
-            );
           }
-        }
-      );
+        );
+      } else {
+        throw makeError(
+          "panic",
+          "client",
+          297,
+          "",
+          "`panic` expression evaluated.",
+          {}
+        );
+      }
     }
   );
 }
 function update_and_schedule(game_state) {
-  return [
-    new Ready(game_state),
-    batch(toList([render2(game_state), schedule_next_frame()]))
-  ];
+  return [new Ready(game_state), batch(toList([render2(game_state)]))];
 }
 function view(model) {
   return div(
@@ -2988,7 +3529,7 @@ function engine_update_loop(loop$game_state, loop$acc) {
     let game_state = loop$game_state;
     let acc = loop$acc;
     let $ = (() => {
-      let _pipe = compare(acc, fixed_dt);
+      let _pipe = compare2(acc, fixed_dt);
       return is_gt_or_eq(_pipe);
     })();
     if ($) {
@@ -3029,7 +3570,7 @@ function update(model, msg) {
   if (msg instanceof AppInitEngine) {
     let previous_time = msg[0];
     return [
-      new Ready(new$6(previous_time, new$7())),
+      new Ready(new$5(previous_time, new$6())),
       batch(toList([setup_listeners(), schedule_next_frame()]))
     ];
   } else if (msg instanceof AppSetNoCanvas) {
@@ -3044,7 +3585,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        75,
+        76,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -3066,7 +3607,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        89,
+        90,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -3081,7 +3622,7 @@ function main() {
     throw makeError(
       "let_assert",
       "client",
-      33,
+      34,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }

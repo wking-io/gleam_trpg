@@ -1,30 +1,24 @@
+import gleam/dict
+import gleam/list
+import gleam/pair
 import lib/coord
 import lib/sprite
 import lib/tile
 
 pub type Map {
   Map(
-    width: Int,
-    height: Int,
     sprite_sheet: sprite.SpriteSheet,
-    tiles: List(tile.Tile),
+    tiles: dict.Dict(coord.Coord, tile.Tile),
   )
 }
 
-pub fn each_tile(map: Map, f: fn(coord.Coord, tile.Tile) -> b) -> Nil {
-  each_tile_loop(map.tiles, coord.new(map.width, map.height), f)
-}
-
-fn each_tile_loop(
-  tiles: List(tile.Tile),
-  coords: coord.Coord,
-  f: fn(coord.Coord, tile.Tile) -> b,
-) -> Nil {
-  case tiles {
-    [] -> Nil
-    [tile, ..rest] -> {
-      f(coord.elevate(coords, tile.elevation), tile)
-      each_tile_loop(rest, coord.next(coords), f)
-    }
-  }
+pub fn each_tile(map: Map, f: fn(coord.Coord, tile.Tile) -> Nil) -> Nil {
+  map.tiles
+  |> dict.to_list
+  |> list.sort(fn(a, b) { coord.compare(pair.first(a), pair.first(b)) })
+  |> list.each(fn(tile_pair) {
+    let coords = pair.first(tile_pair)
+    let tile = pair.second(tile_pair)
+    f(coords, tile)
+  })
 }
