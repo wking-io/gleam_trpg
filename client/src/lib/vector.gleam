@@ -1,6 +1,13 @@
 import gleam/float
+import gleam/int
+import lib/camera
+import lib/coord
 import lib/direction
 import lib/math
+
+const half_width = 32
+
+const half_height = 16
 
 pub opaque type Vector {
   Vector(x: Float, y: Float)
@@ -48,6 +55,22 @@ pub fn from_direction(direction: direction.Direction) -> Vector {
     direction.Left -> at(-1.0, 0.0)
     direction.Right -> at(1.0, 0.0)
   }
+}
+
+pub fn from_coord(coords: coord.Coord, camera: camera.Camera) -> Vector {
+  let dx = coords.x - camera.focus.x
+  let dy = coords.y - camera.focus.y
+  let center_x = camera.width / 2
+  let center_y = camera.height / 2 - half_height
+
+  let screen_x = center_x + { dx - dy } * half_width
+
+  let screen_y = center_y + { dx + dy } * half_height
+
+  at(
+    screen_x |> int.to_float,
+    { screen_y - coords.z * half_height } |> int.to_float,
+  )
 }
 
 pub fn to_pair(vec: Vector) -> #(Float, Float) {

@@ -314,15 +314,6 @@ function max(a, b) {
     return b;
   }
 }
-function add(a, b) {
-  return a + b;
-}
-function multiply(a, b) {
-  return a * b;
-}
-function subtract(a, b) {
-  return a - b;
-}
 
 // build/dev/javascript/gleam_stdlib/gleam/dict.mjs
 function insert(dict, key, value) {
@@ -1639,6 +1630,9 @@ function print_debug(string2) {
 function floor(float2) {
   return Math.floor(float2);
 }
+function round2(float2) {
+  return Math.round(float2);
+}
 function new_map() {
   return Dict.new();
 }
@@ -1783,6 +1777,17 @@ function compare2(a, b) {
     }
   }
 }
+function negate(x3) {
+  return -1 * x3;
+}
+function round(x3) {
+  let $ = x3 >= 0;
+  if ($) {
+    return round2(x3);
+  } else {
+    return 0 - round2(negate(x3));
+  }
+}
 function modulo(dividend, divisor) {
   if (divisor === 0) {
     return new Error(void 0);
@@ -1798,13 +1803,13 @@ function divide(a, b) {
     return new Ok(divideFloat(a, b$1));
   }
 }
-function add3(a, b) {
+function add2(a, b) {
   return a + b;
 }
-function multiply2(a, b) {
+function multiply(a, b) {
   return a * b;
 }
-function subtract2(a, b) {
+function subtract(a, b) {
   return a - b;
 }
 
@@ -2715,14 +2720,37 @@ function canvas(attrs) {
   return element("canvas", attrs, toList([]));
 }
 
+// build/dev/javascript/client/lib/coord.mjs
+var Coord = class extends CustomType {
+  constructor(x3, y3, z) {
+    super();
+    this.x = x3;
+    this.y = y3;
+    this.z = z;
+  }
+};
+function at(x3, y3, z) {
+  return new Coord(max(x3, 0), max(y3, 0), z);
+}
+function sum(coord) {
+  return coord.x + coord.y * 10;
+}
+function compare3(a, b) {
+  return compare(sum(a), sum(b));
+}
+
 // build/dev/javascript/client/lib/math.mjs
+var Single = class extends CustomType {
+};
 var Double = class extends CustomType {
 };
 var Triple = class extends CustomType {
 };
 function scale(from2, amount) {
   let by = (() => {
-    if (amount instanceof Double) {
+    if (amount instanceof Single) {
+      return 1;
+    } else if (amount instanceof Double) {
       return 2;
     } else if (amount instanceof Triple) {
       return 3;
@@ -2730,15 +2758,14 @@ function scale(from2, amount) {
       return 4;
     }
   })();
-  return multiply2(from2, by);
+  return multiply(from2, by);
 }
 
 // build/dev/javascript/client/lib/camera.mjs
 var Camera = class extends CustomType {
-  constructor(x3, y3, width3, height3) {
+  constructor(focus, width3, height3) {
     super();
-    this.x = x3;
-    this.y = y3;
+    this.focus = focus;
     this.width = width3;
     this.height = height3;
   }
@@ -2761,10 +2788,10 @@ function get_viewport(camera, scale2) {
     )
   ];
 }
-var width2 = 320;
-var height2 = 180;
-function new$3() {
-  return new Camera(divideInt(width2, 2), divideInt(height2, 2), width2, height2);
+var width2 = 640;
+var height2 = 360;
+function new$3(focus) {
+  return new Camera(focus, width2, height2);
 }
 
 // build/dev/javascript/client/client_lib_canvas_ffi.mjs
@@ -2901,7 +2928,7 @@ var Vector = class extends CustomType {
 function new$4() {
   return new Vector(0, 0);
 }
-function at(x3, y3) {
+function at2(x3, y3) {
   return new Vector(x3, y3);
 }
 function x(vec) {
@@ -2911,59 +2938,36 @@ function y(vec) {
   return vec.y;
 }
 function move(from2, by) {
-  return at(add3(from2.x, by.x), add3(from2.y, by.y));
+  return at2(add2(from2.x, by.x), add2(from2.y, by.y));
 }
 function from_direction(direction) {
   if (direction instanceof Up) {
-    return at(0, -1);
+    return at2(0, -1);
   } else if (direction instanceof Down) {
-    return at(0, 1);
+    return at2(0, 1);
   } else if (direction instanceof Left) {
-    return at(-1, 0);
+    return at2(-1, 0);
   } else {
-    return at(1, 0);
+    return at2(1, 0);
   }
 }
-
-// build/dev/javascript/client/lib/coord.mjs
-var Coord = class extends CustomType {
-  constructor(x3, y3, z) {
-    super();
-    this.x = x3;
-    this.y = y3;
-    this.z = z;
-  }
-};
-function at2(x3, y3, z) {
-  return new Coord(max(x3, 0), max(y3, 0), z);
-}
-function sum(coord) {
-  return coord.x + coord.y * 10;
-}
-function compare3(a, b) {
-  return compare(sum(a), sum(b));
-}
-var half_width = 16;
-var tile_height = 16;
-var half_height = 8;
-function adjust_by_z(y3, coord) {
-  return y3 - multiply(coord.z, half_height);
-}
-function to_vector(coord) {
-  let screen_x = subtract(160, half_width) + subtract(
-    coord.x,
-    coord.y
-  ) * half_width;
-  let screen_y = tile_height + add(coord.x, coord.y) * half_height;
-  return at(
+var half_width = 32;
+var half_height = 16;
+function from_coord(coords, camera) {
+  let dx = coords.x - camera.focus.x;
+  let dy = coords.y - camera.focus.y;
+  let center_x = divideInt(camera.width, 2);
+  let center_y = divideInt(camera.height, 2) - half_height;
+  let screen_x = center_x + (dx - dy) * half_width;
+  let screen_y = center_y + (dx + dy) * half_height;
+  return at2(
     (() => {
       let _pipe = screen_x;
       return identity(_pipe);
     })(),
     (() => {
-      let _pipe = screen_y;
-      let _pipe$1 = adjust_by_z(_pipe, coord);
-      return identity(_pipe$1);
+      let _pipe = screen_y - coords.z * half_height;
+      return identity(_pipe);
     })()
   );
 }
@@ -3036,8 +3040,14 @@ function render(context, sheet, sprite_region, at3, scale2) {
       let _pipe = y2(sprite_region, sheet.grid);
       return identity(_pipe);
     })(),
-    32,
-    32,
+    (() => {
+      let _pipe = sheet.grid;
+      return identity(_pipe);
+    })(),
+    (() => {
+      let _pipe = sheet.grid;
+      return identity(_pipe);
+    })(),
     (() => {
       let _pipe = x(at3);
       return scale(_pipe, scale2);
@@ -3047,11 +3057,11 @@ function render(context, sheet, sprite_region, at3, scale2) {
       return scale(_pipe, scale2);
     })(),
     (() => {
-      let _pipe = 32;
+      let _pipe = 64;
       return scale(_pipe, scale2);
     })(),
     (() => {
-      let _pipe = 32;
+      let _pipe = 64;
       return scale(_pipe, scale2);
     })()
   );
@@ -3101,9 +3111,9 @@ var sprites = /* @__PURE__ */ toList([
 function sprite_sheet() {
   return new SpriteSheet(
     load_image(
-      "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/test-tiles.png"
+      "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/color-test-tiles.png"
     ),
-    32,
+    64,
     from_list(sprites)
   );
 }
@@ -3187,7 +3197,7 @@ var GameState = class extends CustomType {
 function new$5(init3, map4) {
   return new GameState(
     0,
-    new$3(),
+    new$3(at(4, 3, 0)),
     new$4(),
     new_idle_cursor(),
     new_queue(),
@@ -3201,7 +3211,7 @@ function new$5(init3, map4) {
 // build/dev/javascript/client/lib/frames.mjs
 var dt_s = 0.01667;
 function to_duration(count) {
-  return multiply2(dt_s, count);
+  return multiply(dt_s, count);
 }
 
 // build/dev/javascript/client/lib/map/demo_one.mjs
@@ -3211,70 +3221,70 @@ function new_tile(variant) {
 function new$6() {
   let tiles = from_list(
     toList([
-      [at2(0, 0, 0), new_tile(new Base())],
-      [at2(1, 0, 0), new_tile(new Variant1())],
-      [at2(2, 0, 0), new_tile(new Variant6())],
-      [at2(3, 0, 0), new_tile(new Base())],
-      [at2(4, 0, 0), new_tile(new Variant4())],
-      [at2(5, 0, 0), new_tile(new Variant5())],
-      [at2(6, 0, 0), new_tile(new Variant2())],
-      [at2(7, 0, 0), new_tile(new Base())],
-      [at2(0, 1, 0), new_tile(new Variant3())],
-      [at2(1, 1, 0), new_tile(new Variant4())],
-      [at2(2, 1, 0), new_tile(new Base())],
-      [at2(3, 1, 0), new_tile(new Variant5())],
-      [at2(4, 1, 0), new_tile(new Variant1())],
-      [at2(5, 1, 0), new_tile(new Base())],
-      [at2(6, 1, 0), new_tile(new Variant6())],
-      [at2(7, 1, 0), new_tile(new Variant2())],
-      [at2(0, 2, 0), new_tile(new Variant2())],
-      [at2(1, 2, 0), new_tile(new Base())],
-      [at2(2, 2, 0), new_tile(new Base())],
-      [at2(3, 2, 0), new_tile(new Variant1())],
-      [at2(4, 2, 0), new_tile(new Variant1())],
-      [at2(5, 2, 0), new_tile(new Base())],
-      [at2(6, 2, 0), new_tile(new Variant3())],
-      [at2(7, 2, 0), new_tile(new Base())],
-      [at2(0, 3, 0), new_tile(new Base())],
-      [at2(1, 3, 0), new_tile(new Variant4())],
-      [at2(2, 3, 0), new_tile(new Base())],
-      [at2(3, 3, 2), new_tile(new Variant1())],
-      [at2(4, 3, 2), new_tile(new Variant3())],
-      [at2(5, 3, 0), new_tile(new Base())],
-      [at2(6, 3, 0), new_tile(new Base())],
-      [at2(7, 3, 0), new_tile(new Variant2())],
-      [at2(0, 4, 0), new_tile(new Variant3())],
-      [at2(1, 4, 0), new_tile(new Base())],
-      [at2(2, 4, 0), new_tile(new Variant4())],
-      [at2(3, 4, 2), new_tile(new Base())],
-      [at2(4, 4, 2), new_tile(new Variant5())],
-      [at2(5, 4, 0), new_tile(new Base())],
-      [at2(6, 4, 0), new_tile(new Base())],
-      [at2(7, 4, 0), new_tile(new Variant1())],
-      [at2(0, 5, 0), new_tile(new Base())],
-      [at2(1, 5, 0), new_tile(new Variant1())],
-      [at2(2, 5, 0), new_tile(new Base())],
-      [at2(3, 5, 0), new_tile(new Variant3())],
-      [at2(4, 5, 0), new_tile(new Base())],
-      [at2(5, 5, 0), new_tile(new Variant2())],
-      [at2(6, 5, 0), new_tile(new Variant5())],
-      [at2(7, 5, 0), new_tile(new Base())],
-      [at2(0, 6, 0), new_tile(new Variant4())],
-      [at2(1, 6, 0), new_tile(new Variant2())],
-      [at2(2, 6, 0), new_tile(new Base())],
-      [at2(3, 6, 0), new_tile(new Base())],
-      [at2(4, 6, 0), new_tile(new Variant5())],
-      [at2(5, 6, 0), new_tile(new Base())],
-      [at2(6, 6, 0), new_tile(new Variant6())],
-      [at2(7, 6, 0), new_tile(new Base())],
-      [at2(0, 7, 0), new_tile(new Variant6())],
-      [at2(1, 7, 0), new_tile(new Base())],
-      [at2(2, 7, 0), new_tile(new Variant1())],
-      [at2(3, 7, 0), new_tile(new Variant4())],
-      [at2(4, 7, 0), new_tile(new Base())],
-      [at2(5, 7, 0), new_tile(new Base())],
-      [at2(6, 7, 0), new_tile(new Base())],
-      [at2(7, 7, 0), new_tile(new Variant2())]
+      [at(0, 0, 0), new_tile(new Base())],
+      [at(1, 0, 0), new_tile(new Variant1())],
+      [at(2, 0, 0), new_tile(new Variant6())],
+      [at(3, 0, 0), new_tile(new Base())],
+      [at(4, 0, 0), new_tile(new Variant4())],
+      [at(5, 0, 0), new_tile(new Variant5())],
+      [at(6, 0, 0), new_tile(new Variant2())],
+      [at(7, 0, 0), new_tile(new Base())],
+      [at(0, 1, 0), new_tile(new Variant3())],
+      [at(1, 1, 0), new_tile(new Variant4())],
+      [at(2, 1, 0), new_tile(new Base())],
+      [at(3, 1, 0), new_tile(new Variant5())],
+      [at(4, 1, 0), new_tile(new Variant1())],
+      [at(5, 1, 0), new_tile(new Base())],
+      [at(6, 1, 0), new_tile(new Variant6())],
+      [at(7, 1, 0), new_tile(new Variant2())],
+      [at(0, 2, 0), new_tile(new Variant2())],
+      [at(1, 2, 0), new_tile(new Base())],
+      [at(2, 2, 0), new_tile(new Base())],
+      [at(3, 2, 0), new_tile(new Variant1())],
+      [at(4, 2, 0), new_tile(new Variant1())],
+      [at(5, 2, 0), new_tile(new Base())],
+      [at(6, 2, 0), new_tile(new Variant3())],
+      [at(7, 2, 0), new_tile(new Base())],
+      [at(0, 3, 0), new_tile(new Base())],
+      [at(1, 3, 0), new_tile(new Variant4())],
+      [at(2, 3, 0), new_tile(new Base())],
+      [at(3, 3, 0), new_tile(new Variant1())],
+      [at(4, 3, 0), new_tile(new Variant3())],
+      [at(5, 3, 0), new_tile(new Base())],
+      [at(6, 3, 0), new_tile(new Base())],
+      [at(7, 3, 0), new_tile(new Variant2())],
+      [at(0, 4, 0), new_tile(new Variant3())],
+      [at(1, 4, 0), new_tile(new Base())],
+      [at(2, 4, 0), new_tile(new Variant4())],
+      [at(3, 4, 0), new_tile(new Base())],
+      [at(4, 4, 0), new_tile(new Variant5())],
+      [at(5, 4, 0), new_tile(new Base())],
+      [at(6, 4, 0), new_tile(new Base())],
+      [at(7, 4, 0), new_tile(new Variant1())],
+      [at(0, 5, 0), new_tile(new Base())],
+      [at(1, 5, 0), new_tile(new Variant1())],
+      [at(2, 5, 0), new_tile(new Base())],
+      [at(3, 5, 0), new_tile(new Variant3())],
+      [at(4, 5, 0), new_tile(new Base())],
+      [at(5, 5, 0), new_tile(new Variant2())],
+      [at(6, 5, 0), new_tile(new Variant5())],
+      [at(7, 5, 0), new_tile(new Base())],
+      [at(0, 6, 0), new_tile(new Variant4())],
+      [at(1, 6, 0), new_tile(new Variant2())],
+      [at(2, 6, 0), new_tile(new Base())],
+      [at(3, 6, 0), new_tile(new Base())],
+      [at(4, 6, 0), new_tile(new Variant5())],
+      [at(5, 6, 0), new_tile(new Base())],
+      [at(6, 6, 0), new_tile(new Variant6())],
+      [at(7, 6, 0), new_tile(new Base())],
+      [at(0, 7, 0), new_tile(new Variant6())],
+      [at(1, 7, 0), new_tile(new Base())],
+      [at(2, 7, 0), new_tile(new Variant1())],
+      [at(3, 7, 0), new_tile(new Variant4())],
+      [at(4, 7, 0), new_tile(new Base())],
+      [at(5, 7, 0), new_tile(new Base())],
+      [at(6, 7, 0), new_tile(new Base())],
+      [at(7, 7, 0), new_tile(new Variant2())]
     ])
   );
   return new Map3(sprite_sheet(), tiles);
@@ -3355,7 +3365,7 @@ function run_logic_update(game_state, dt_seconds) {
       let amplitude = $.amplitude;
       let looped_elapsed = (() => {
         let _pipe = elapsed;
-        let _pipe$1 = add3(_pipe, dt_seconds);
+        let _pipe$1 = add2(_pipe, dt_seconds);
         let _pipe$2 = modulo(_pipe$1, cycle);
         return unwrap(_pipe$2, 0);
       })();
@@ -3365,7 +3375,7 @@ function run_logic_update(game_state, dt_seconds) {
       let target = $.target;
       let elapsed = $.elapsed;
       let duration = $.duration;
-      let new_elapsed = add3(elapsed, dt_seconds);
+      let new_elapsed = add2(elapsed, dt_seconds);
       let $1 = compare2(new_elapsed, duration);
       if ($1 instanceof Lt) {
         return new CursorMoving(start3, target, new_elapsed, duration);
@@ -3442,6 +3452,35 @@ function schedule_next_frame() {
     }
   );
 }
+function get_canvas_dimensions(model) {
+  if (model instanceof Ready) {
+    let game_state = model.game_state;
+    return [
+      (() => {
+        let _pipe = scale(
+          (() => {
+            let _pipe2 = game_state.camera.width;
+            return identity(_pipe2);
+          })(),
+          game_state.scale
+        );
+        return round(_pipe);
+      })(),
+      (() => {
+        let _pipe = scale(
+          (() => {
+            let _pipe2 = game_state.camera.height;
+            return identity(_pipe2);
+          })(),
+          game_state.scale
+        );
+        return round(_pipe);
+      })()
+    ];
+  } else {
+    return [640, 360];
+  }
+}
 function render2(game_state) {
   return from(
     (_) => {
@@ -3465,18 +3504,19 @@ function render2(game_state) {
             return each_tile(
               _pipe,
               (coords, tile) => {
-                debug(coords);
                 let sprite_region = (() => {
                   let _pipe$1 = game_state.map.sprite_sheet;
                   return get_sprite(_pipe$1, tile.tileset);
                 })();
                 if (sprite_region.isOk()) {
                   let region = sprite_region[0];
+                  let vector = from_coord(coords, game_state.camera);
+                  debug(["VECTOR: ", coords, vector]);
                   render(
                     context,
                     game_state.map.sprite_sheet,
                     region,
-                    to_vector(coords),
+                    vector,
                     game_state.scale
                   );
                   return void 0;
@@ -3491,7 +3531,7 @@ function render2(game_state) {
         throw makeError(
           "panic",
           "client",
-          297,
+          366,
           "",
           "`panic` expression evaluated.",
           {}
@@ -3504,19 +3544,93 @@ function update_and_schedule(game_state) {
   return [new Ready(game_state), batch(toList([render2(game_state)]))];
 }
 function view(model) {
+  let $ = get_canvas_dimensions(model);
+  let canvas_width = $[0];
+  let canvas_height = $[1];
+  let half_width_px = (() => {
+    let _pipe = divideInt(canvas_width, 2);
+    return to_string(_pipe);
+  })() + "px";
+  let half_height_px = (() => {
+    let _pipe = divideInt(canvas_height, 2);
+    return to_string(_pipe);
+  })() + "px";
   return div(
-    toList([]),
     toList([
-      canvas(
+      style(
         toList([
-          id(render_target_id),
-          width(640),
-          height(360),
+          ["display", "flex"],
+          ["align-items", "center"],
+          ["justify-content", "center"],
+          ["width", "100vw"],
+          ["height", "100vh"]
+        ])
+      )
+    ]),
+    toList([
+      div(
+        toList([
           style(
             toList([
-              ["image-rendering", "pixelated"],
+              ["position", "relative"],
+              [
+                "width",
+                (() => {
+                  let _pipe = canvas_width;
+                  return to_string(_pipe);
+                })() + "px"
+              ],
+              [
+                "height",
+                (() => {
+                  let _pipe = canvas_height;
+                  return to_string(_pipe);
+                })() + "px"
+              ],
               ["border", "1px solid black"]
             ])
+          )
+        ]),
+        toList([
+          canvas(
+            toList([
+              id(render_target_id),
+              width(canvas_width),
+              height(canvas_height),
+              style(toList([["image-rendering", "pixelated"]]))
+            ])
+          ),
+          div(
+            toList([
+              style(
+                toList([
+                  ["position", "absolute"],
+                  ["left", "0"],
+                  ["width", half_width_px],
+                  ["background", "red"],
+                  ["top", "0"],
+                  ["bottom", "0"],
+                  ["opacity", "10%"]
+                ])
+              )
+            ]),
+            toList([])
+          ),
+          div(
+            toList([
+              style(
+                toList([
+                  ["position", "absolute"],
+                  ["left", "0"],
+                  ["height", half_height_px],
+                  ["background", "blue"],
+                  ["top", "0"],
+                  ["right", "0"],
+                  ["opacity", "10%"]
+                ])
+              )
+            ]),
+            toList([])
           )
         ])
       )
@@ -3541,15 +3655,15 @@ function engine_update_loop(loop$game_state, loop$acc) {
       let _pipe$1 = apply_events(_pipe, game_state.event_queue);
       let _pipe$2 = run_logic_update(_pipe$1, dt_seconds);
       loop$game_state = _pipe$2;
-      loop$acc = subtract2(acc, fixed_dt);
+      loop$acc = subtract(acc, fixed_dt);
     } else {
       return game_state.withFields({ accumulator: 0 });
     }
   }
 }
 function engine_update(game_state, current_time) {
-  let frame_time = subtract2(current_time, game_state.previous_time);
-  let accumulator = add3(game_state.accumulator, frame_time);
+  let frame_time = subtract(current_time, game_state.previous_time);
+  let accumulator = add2(game_state.accumulator, frame_time);
   let fps = (() => {
     let $ = divide(1e3, frame_time);
     if ($.isOk()) {
@@ -3585,7 +3699,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        76,
+        78,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -3607,7 +3721,7 @@ function update(model, msg) {
       throw makeError(
         "panic",
         "client",
-        90,
+        92,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -3622,7 +3736,7 @@ function main() {
     throw makeError(
       "let_assert",
       "client",
-      34,
+      36,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }

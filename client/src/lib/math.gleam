@@ -11,6 +11,7 @@ pub fn interpolate(from: Float, to: Float, progress: Float) {
 }
 
 pub type Scale {
+  Single
   Double
   Triple
   Quad
@@ -18,6 +19,7 @@ pub type Scale {
 
 pub fn scale(from: Float, amount: Scale) {
   let by = case amount {
+    Single -> 1.0
     Double -> 2.0
     Triple -> 3.0
     Quad -> 4.0

@@ -1,19 +1,10 @@
 import gleam/int
 import gleam/order
-import lib/vector
-
-const tile_width = 32
-
-const half_width = 16
-
-const tile_height = 16
-
-const half_height = 8
 
 // A Coord is a 3D Point in a constrained space
 // Space that the coords exist on are a grid
 // that is incremented in single digit Ints
-pub opaque type Coord {
+pub type Coord {
   Coord(x: Int, y: Int, z: Int)
 }
 
@@ -55,21 +46,6 @@ pub fn x(coord: Coord) {
 
 pub fn y(coord: Coord) {
   coord.y
-}
-
-fn adjust_by_z(y: Int, coord: Coord) {
-  y - int.multiply(coord.z, half_height)
-}
-
-pub fn to_vector(coord: Coord) -> vector.Vector {
-  let screen_x =
-    int.subtract(160, half_width) + int.subtract(coord.x, coord.y) * half_width
-  let screen_y = tile_height + int.add(coord.x, coord.y) * half_height
-
-  vector.at(
-    screen_x |> int.to_float,
-    screen_y |> adjust_by_z(coord) |> int.to_float,
-  )
 }
 
 pub fn compare(a: Coord, b: Coord) -> order.Order {

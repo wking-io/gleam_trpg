@@ -1,4 +1,5 @@
 import lib/camera
+import lib/coord
 import lib/cursor
 import lib/event
 import lib/map
@@ -22,7 +23,7 @@ pub type GameState {
 pub fn new(init: Float, map: map.Map) -> GameState {
   GameState(
     accumulator: 0.0,
-    camera: camera.new(),
+    camera: camera.new(coord.at(4, 3, 0)),
     cursor: vector.new(),
     cursor_animation: cursor.new_idle_cursor(),
     event_queue: event.new_queue(),

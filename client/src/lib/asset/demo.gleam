@@ -36,9 +36,9 @@ const sprites = [
 pub fn sprite_sheet() -> sprite.SpriteSheet {
   sprite.SpriteSheet(
     asset: asset.load_image(
-      "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/test-tiles.png",
+      "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/color-test-tiles.png",
     ),
-    grid: 32,
+    grid: 64,
     sprites: dict.from_list(sprites),
   )
 }

@@ -37,11 +37,11 @@ pub fn render(
     sheet.asset,
     x(sprite_region, sheet.grid) |> int.to_float,
     y(sprite_region, sheet.grid) |> int.to_float,
-    32.0,
-    32.0,
+    sheet.grid |> int.to_float,
+    sheet.grid |> int.to_float,
     vector.x(at) |> math.scale(scale),
     vector.y(at) |> math.scale(scale),
-    32.0 |> math.scale(scale),
-    32.0 |> math.scale(scale),
+    64.0 |> math.scale(scale),
+    64.0 |> math.scale(scale),
   )
 }

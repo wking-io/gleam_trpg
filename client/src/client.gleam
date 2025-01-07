@@ -1,6 +1,7 @@
 // IMPORTS ---------------------------------------------------------------------
 
 import gleam/float
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/order.{type Order}
@@ -17,6 +18,7 @@ import lib/frames
 import lib/input
 import lib/map
 import lib/map/demo_one
+import lib/math
 import lib/render
 import lib/sprite
 import lib/tile
@@ -243,17 +245,81 @@ fn schedule_next_frame() {
 // VIEW ------------------------------------------------------------------------
 
 fn view(model: Model) -> Element(Msg) {
-  html.div([], [
-    html.canvas([
-      attribute.id(render.render_target_id),
-      attribute.width(640),
-      attribute.height(360),
+  let #(canvas_width, canvas_height) = get_canvas_dimensions(model)
+  let half_width_px = { canvas_width / 2 } |> int.to_string <> "px"
+  let half_height_px = { canvas_height / 2 } |> int.to_string <> "px"
+
+  html.div(
+    [
       attribute.style([
-        #("image-rendering", "pixelated"),
-        #("border", "1px solid black"),
+        #("display", "flex"),
+        #("align-items", "center"),
+        #("justify-content", "center"),
+        #("width", "100vw"),
+        #("height", "100vh"),
       ]),
-    ]),
-  ])
+    ],
+    [
+      html.div(
+        [
+          attribute.style([
+            #("position", "relative"),
+            #("width", canvas_width |> int.to_string <> "px"),
+            #("height", canvas_height |> int.to_string <> "px"),
+            #("border", "1px solid black"),
+          ]),
+        ],
+        [
+          html.canvas([
+            attribute.id(render.render_target_id),
+            attribute.width(canvas_width),
+            attribute.height(canvas_height),
+            attribute.style([#("image-rendering", "pixelated")]),
+          ]),
+          html.div(
+            [
+              attribute.style([
+                #("position", "absolute"),
+                #("left", "0"),
+                #("width", half_width_px),
+                #("background", "red"),
+                #("top", "0"),
+                #("bottom", "0"),
+                #("opacity", "10%"),
+              ]),
+            ],
+            [],
+          ),
+          html.div(
+            [
+              attribute.style([
+                #("position", "absolute"),
+                #("left", "0"),
+                #("height", half_height_px),
+                #("background", "blue"),
+                #("top", "0"),
+                #("right", "0"),
+                #("opacity", "10%"),
+              ]),
+            ],
+            [],
+          ),
+        ],
+      ),
+    ],
+  )
+}
+
+fn get_canvas_dimensions(model: Model) {
+  case model {
+    Ready(game_state) -> #(
+      math.scale(game_state.camera.width |> int.to_float, game_state.scale)
+        |> float.round,
+      math.scale(game_state.camera.height |> int.to_float, game_state.scale)
+        |> float.round,
+    )
+    _ -> #(640, 360)
+  }
 }
 
 fn render(game_state: engine.GameState) -> Effect(Msg) {
@@ -273,18 +339,21 @@ fn render(game_state: engine.GameState) -> Effect(Msg) {
 
           game_state.map
           |> map.each_tile(fn(coords, tile) {
-            io.debug(coords)
             let sprite_region =
               game_state.map.sprite_sheet
               |> tile.get_sprite(tile.tileset)
 
             case sprite_region {
               Ok(region) -> {
+                let vector = vector.from_coord(coords, game_state.camera)
+
+                io.debug(#("VECTOR: ", coords, vector))
+
                 sprite.render(
                   context,
                   game_state.map.sprite_sheet,
                   region,
-                  coord.to_vector(coords),
+                  vector,
                   game_state.scale,
                 )
                 Nil
