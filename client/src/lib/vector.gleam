@@ -5,9 +5,9 @@ import lib/coord
 import lib/direction
 import lib/math
 
-const half_width = 32
+const half_width = 16
 
-const half_height = 16
+const half_height = 8
 
 pub opaque type Vector {
   Vector(x: Float, y: Float)

@@ -41,7 +41,7 @@ pub fn render(
     sheet.grid |> int.to_float,
     vector.x(at) |> math.scale(scale),
     vector.y(at) |> math.scale(scale),
-    64.0 |> math.scale(scale),
-    64.0 |> math.scale(scale),
+    sheet.grid |> int.to_float |> math.scale(scale),
+    sheet.grid |> int.to_float |> math.scale(scale),
   )
 }

@@ -38,7 +38,7 @@ pub fn sprite_sheet() -> sprite.SpriteSheet {
     asset: asset.load_image(
       "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/color-test-tiles.png",
     ),
-    grid: 64,
+    grid: 32,
     sprites: dict.from_list(sprites),
   )
 }

@@ -2,7 +2,7 @@
 var CustomType = class {
   withFields(fields) {
     let properties = Object.keys(this).map(
-      (label) => label in fields ? fields[label] : this[label]
+      (label2) => label2 in fields ? fields[label2] : this[label2]
     );
     return new this.constructor(...properties);
   }
@@ -289,8 +289,22 @@ var Gt = class extends CustomType {
 };
 
 // build/dev/javascript/gleam_stdlib/gleam/option.mjs
+var Some = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
 var None = class extends CustomType {
 };
+function to_result(option, e) {
+  if (option instanceof Some) {
+    let a = option[0];
+    return new Ok(a);
+  } else {
+    return new Error(e);
+  }
+}
 
 // build/dev/javascript/gleam_stdlib/gleam/int.mjs
 function compare(a, b) {
@@ -400,6 +414,25 @@ function reverse_loop(loop$remaining, loop$accumulator) {
 }
 function reverse(list) {
   return reverse_loop(list, toList([]));
+}
+function map_loop(loop$list, loop$fun, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let fun = loop$fun;
+    let acc = loop$acc;
+    if (list.hasLength(0)) {
+      return reverse(acc);
+    } else {
+      let first$1 = list.head;
+      let rest$1 = list.tail;
+      loop$list = rest$1;
+      loop$fun = fun;
+      loop$acc = prepend(fun(first$1), acc);
+    }
+  }
+}
+function map(list, fun) {
+  return map_loop(list, fun, toList([]));
 }
 function append_loop(loop$first, loop$second) {
   while (true) {
@@ -806,19 +839,19 @@ function each(loop$list, loop$f) {
 // build/dev/javascript/gleam_stdlib/gleam/string.mjs
 function drop_start(loop$string, loop$num_graphemes) {
   while (true) {
-    let string2 = loop$string;
+    let string3 = loop$string;
     let num_graphemes = loop$num_graphemes;
     let $ = num_graphemes > 0;
     if (!$) {
-      return string2;
+      return string3;
     } else {
-      let $1 = pop_grapheme(string2);
+      let $1 = pop_grapheme(string3);
       if ($1.isOk()) {
         let string$1 = $1[0][1];
         loop$string = string$1;
         loop$num_graphemes = num_graphemes - 1;
       } else {
-        return string2;
+        return string3;
       }
     }
   }
@@ -829,6 +862,24 @@ function inspect2(term) {
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/result.mjs
+function map2(result, fun) {
+  if (result.isOk()) {
+    let x3 = result[0];
+    return new Ok(fun(x3));
+  } else {
+    let e = result[0];
+    return new Error(e);
+  }
+}
+function map_error(result, fun) {
+  if (result.isOk()) {
+    let x3 = result[0];
+    return new Ok(x3);
+  } else {
+    let error = result[0];
+    return new Error(fun(error));
+  }
+}
 function try$(result, fun) {
   if (result.isOk()) {
     let x3 = result[0];
@@ -845,6 +896,91 @@ function unwrap(result, default$) {
   } else {
     return default$;
   }
+}
+
+// build/dev/javascript/gleam_stdlib/gleam/dynamic.mjs
+var DecodeError = class extends CustomType {
+  constructor(expected, found, path) {
+    super();
+    this.expected = expected;
+    this.found = found;
+    this.path = path;
+  }
+};
+function int(data) {
+  return decode_int(data);
+}
+function bool(data) {
+  return decode_bool(data);
+}
+function any(decoders) {
+  return (data) => {
+    if (decoders.hasLength(0)) {
+      return new Error(
+        toList([new DecodeError("another type", classify_dynamic(data), toList([]))])
+      );
+    } else {
+      let decoder = decoders.head;
+      let decoders$1 = decoders.tail;
+      let $ = decoder(data);
+      if ($.isOk()) {
+        let decoded = $[0];
+        return new Ok(decoded);
+      } else {
+        return any(decoders$1)(data);
+      }
+    }
+  };
+}
+function push_path(error, name) {
+  let name$1 = identity(name);
+  let decoder = any(
+    toList([string, (x3) => {
+      return map2(int(x3), to_string);
+    }])
+  );
+  let name$2 = (() => {
+    let $ = decoder(name$1);
+    if ($.isOk()) {
+      let name$22 = $[0];
+      return name$22;
+    } else {
+      let _pipe = toList(["<", classify_dynamic(name$1), ">"]);
+      let _pipe$1 = concat(_pipe);
+      return identity(_pipe$1);
+    }
+  })();
+  return error.withFields({ path: prepend(name$2, error.path) });
+}
+function map_errors(result, f) {
+  return map_error(
+    result,
+    (_capture) => {
+      return map(_capture, f);
+    }
+  );
+}
+function string(data) {
+  return decode_string(data);
+}
+function field(name, inner_type) {
+  return (value) => {
+    let missing_field_error = new DecodeError("field", "nothing", toList([]));
+    return try$(
+      decode_field(value, name),
+      (maybe_inner) => {
+        let _pipe = maybe_inner;
+        let _pipe$1 = to_result(_pipe, toList([missing_field_error]));
+        let _pipe$2 = try$(_pipe$1, inner_type);
+        return map_errors(
+          _pipe$2,
+          (_capture) => {
+            return push_path(_capture, name);
+          }
+        );
+      }
+    );
+  };
 }
 
 // build/dev/javascript/gleam_stdlib/dict.mjs
@@ -1562,39 +1698,46 @@ function identity(x3) {
 function to_string(term) {
   return term.toString();
 }
-function float_to_string(float2) {
-  const string2 = float2.toString().replace("+", "");
-  if (string2.indexOf(".") >= 0) {
-    return string2;
+function float_to_string(float3) {
+  const string3 = float3.toString().replace("+", "");
+  if (string3.indexOf(".") >= 0) {
+    return string3;
   } else {
-    const index2 = string2.indexOf("e");
+    const index2 = string3.indexOf("e");
     if (index2 >= 0) {
-      return string2.slice(0, index2) + ".0" + string2.slice(index2);
+      return string3.slice(0, index2) + ".0" + string3.slice(index2);
     } else {
-      return string2 + ".0";
+      return string3 + ".0";
     }
   }
 }
 var segmenter = void 0;
-function graphemes_iterator(string2) {
+function graphemes_iterator(string3) {
   if (globalThis.Intl && Intl.Segmenter) {
     segmenter ||= new Intl.Segmenter();
-    return segmenter.segment(string2)[Symbol.iterator]();
+    return segmenter.segment(string3)[Symbol.iterator]();
   }
 }
-function pop_grapheme(string2) {
+function pop_grapheme(string3) {
   let first3;
-  const iterator = graphemes_iterator(string2);
+  const iterator = graphemes_iterator(string3);
   if (iterator) {
     first3 = iterator.next().value?.segment;
   } else {
-    first3 = string2.match(/./su)?.[0];
+    first3 = string3.match(/./su)?.[0];
   }
   if (first3) {
-    return new Ok([first3, string2.slice(first3.length)]);
+    return new Ok([first3, string3.slice(first3.length)]);
   } else {
     return new Error(Nil);
   }
+}
+function concat(xs) {
+  let result = "";
+  for (const x3 of xs) {
+    result = result + x3;
+  }
+  return result;
 }
 var unicode_whitespaces = [
   " ",
@@ -1618,20 +1761,20 @@ var unicode_whitespaces = [
 ].join("");
 var trim_start_regex = new RegExp(`^[${unicode_whitespaces}]*`);
 var trim_end_regex = new RegExp(`[${unicode_whitespaces}]*$`);
-function print_debug(string2) {
+function print_debug(string3) {
   if (typeof process === "object" && process.stderr?.write) {
-    process.stderr.write(string2 + "\n");
+    process.stderr.write(string3 + "\n");
   } else if (typeof Deno === "object") {
-    Deno.stderr.writeSync(new TextEncoder().encode(string2 + "\n"));
+    Deno.stderr.writeSync(new TextEncoder().encode(string3 + "\n"));
   } else {
-    console.log(string2);
+    console.log(string3);
   }
 }
-function floor(float2) {
-  return Math.floor(float2);
+function floor(float3) {
+  return Math.floor(float3);
 }
-function round2(float2) {
-  return Math.round(float2);
+function round2(float3) {
+  return Math.round(float3);
 }
 function new_map() {
   return Dict.new();
@@ -1648,6 +1791,71 @@ function map_get(map4, key) {
 }
 function map_insert(key, value, map4) {
   return map4.set(key, value);
+}
+function classify_dynamic(data) {
+  if (typeof data === "string") {
+    return "String";
+  } else if (typeof data === "boolean") {
+    return "Bool";
+  } else if (data instanceof Result) {
+    return "Result";
+  } else if (data instanceof List) {
+    return "List";
+  } else if (data instanceof BitArray) {
+    return "BitArray";
+  } else if (data instanceof Dict) {
+    return "Dict";
+  } else if (Number.isInteger(data)) {
+    return "Int";
+  } else if (Array.isArray(data)) {
+    return `Tuple of ${data.length} elements`;
+  } else if (typeof data === "number") {
+    return "Float";
+  } else if (data === null) {
+    return "Null";
+  } else if (data === void 0) {
+    return "Nil";
+  } else {
+    const type = typeof data;
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+}
+function decoder_error(expected, got) {
+  return decoder_error_no_classify(expected, classify_dynamic(got));
+}
+function decoder_error_no_classify(expected, got) {
+  return new Error(
+    List.fromArray([new DecodeError(expected, got, List.fromArray([]))])
+  );
+}
+function decode_string(data) {
+  return typeof data === "string" ? new Ok(data) : decoder_error("String", data);
+}
+function decode_int(data) {
+  return Number.isInteger(data) ? new Ok(data) : decoder_error("Int", data);
+}
+function decode_bool(data) {
+  return typeof data === "boolean" ? new Ok(data) : decoder_error("Bool", data);
+}
+function decode_field(value, name) {
+  const not_a_map_error = () => decoder_error("Dict", value);
+  if (value instanceof Dict || value instanceof WeakMap || value instanceof Map) {
+    const entry = map_get(value, name);
+    return new Ok(entry.isOk() ? new Some(entry[0]) : new None());
+  } else if (value === null) {
+    return not_a_map_error();
+  } else if (Object.getPrototypeOf(value) == Object.prototype) {
+    return try_get_field(value, name, () => new Ok(new None()));
+  } else {
+    return try_get_field(value, name, not_a_map_error);
+  }
+}
+function try_get_field(value, field2, or_else) {
+  try {
+    return field2 in value ? new Ok(new Some(value[field2])) : or_else();
+  } catch {
+    return or_else();
+  }
 }
 function inspect(v) {
   const t = typeof v;
@@ -1747,9 +1955,9 @@ function inspectObject(v) {
   return `//js(${head}{${body}})`;
 }
 function inspectCustomType(record) {
-  const props = Object.keys(record).map((label) => {
-    const value = inspect(record[label]);
-    return isNaN(parseInt(label)) ? `${label}: ${value}` : value;
+  const props = Object.keys(record).map((label2) => {
+    const value = inspect(record[label2]);
+    return isNaN(parseInt(label2)) ? `${label2}: ${value}` : value;
   }).join(", ");
   return props ? `${record.constructor.name}(${props})` : record.constructor.name;
 }
@@ -1811,14 +2019,6 @@ function multiply(a, b) {
 }
 function subtract(a, b) {
   return a - b;
-}
-
-// build/dev/javascript/gleam_stdlib/gleam/io.mjs
-function debug(term) {
-  let _pipe = term;
-  let _pipe$1 = inspect2(_pipe);
-  print_debug(_pipe$1);
-  return term;
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/bool.mjs
@@ -1900,6 +2100,13 @@ var Attribute = class extends CustomType {
     this.as_property = as_property;
   }
 };
+var Event = class extends CustomType {
+  constructor(x0, x1) {
+    super();
+    this[0] = x0;
+    this[1] = x1;
+  }
+};
 function attribute_to_event_handler(attribute2) {
   if (attribute2 instanceof Attribute) {
     return new Error(void 0);
@@ -1964,6 +2171,9 @@ function attribute(name, value) {
 function property(name, value) {
   return new Attribute(name, identity(value), true);
 }
+function on(name, handler) {
+  return new Event("on" + name, handler);
+}
 function style(properties) {
   return attribute(
     "style",
@@ -1978,8 +2188,17 @@ function style(properties) {
     )
   );
 }
+function class$(name) {
+  return attribute("class", name);
+}
 function id(name) {
   return attribute("id", name);
+}
+function type_(name) {
+  return attribute("type", name);
+}
+function checked(is_checked) {
+  return property("checked", is_checked);
 }
 function height(val) {
   return property("height", val);
@@ -2021,6 +2240,9 @@ function element(tag, attrs, children2) {
   } else {
     return new Element("", "", tag, attrs, children2, false, false);
   }
+}
+function text(content) {
+  return new Text(content);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/set.mjs
@@ -2315,25 +2537,25 @@ function createElementNode({ prev, next, dispatch, stack }) {
   return el;
 }
 var registeredHandlers = /* @__PURE__ */ new WeakMap();
-function lustreGenericEventHandler(event) {
-  const target = event.currentTarget;
+function lustreGenericEventHandler(event2) {
+  const target = event2.currentTarget;
   if (!registeredHandlers.has(target)) {
-    target.removeEventListener(event.type, lustreGenericEventHandler);
+    target.removeEventListener(event2.type, lustreGenericEventHandler);
     return;
   }
   const handlersForEventTarget = registeredHandlers.get(target);
-  if (!handlersForEventTarget.has(event.type)) {
-    target.removeEventListener(event.type, lustreGenericEventHandler);
+  if (!handlersForEventTarget.has(event2.type)) {
+    target.removeEventListener(event2.type, lustreGenericEventHandler);
     return;
   }
-  handlersForEventTarget.get(event.type)(event);
+  handlersForEventTarget.get(event2.type)(event2);
 }
-function lustreServerEventHandler(event) {
-  const el = event.currentTarget;
-  const tag = el.getAttribute(`data-lustre-on-${event.type}`);
+function lustreServerEventHandler(event2) {
+  const el = event2.currentTarget;
+  const tag = el.getAttribute(`data-lustre-on-${event2.type}`);
   const data = JSON.parse(el.getAttribute("data-lustre-data") || "{}");
   const include = JSON.parse(el.getAttribute("data-lustre-include") || "[]");
-  switch (event.type) {
+  switch (event2.type) {
     case "input":
     case "change":
       include.push("target.value");
@@ -2344,7 +2566,7 @@ function lustreServerEventHandler(event) {
     data: include.reduce(
       (data2, property2) => {
         const path = property2.split(".");
-        for (let i = 0, o = data2, e = event; i < path.length; i++) {
+        for (let i = 0, o = data2, e = event2; i < path.length; i++) {
           if (i === path.length - 1) {
             o[path[i]] = e[path[i]];
           } else {
@@ -2434,13 +2656,13 @@ var LustreClientApplication = class _LustreClientApplication {
    *
    * @returns {Gleam.Ok<(action: Lustre.Action<Lustre.Client, Msg>>) => void>}
    */
-  static start({ init: init3, update: update2, view: view2 }, selector, flags) {
+  static start({ init: init3, update: update4, view: view2 }, selector, flags) {
     if (!is_browser())
       return new Error(new NotABrowser());
     const root = selector instanceof HTMLElement ? selector : document.querySelector(selector);
     if (!root)
       return new Error(new ElementNotFound(selector));
-    const app = new _LustreClientApplication(root, init3(flags), update2, view2);
+    const app = new _LustreClientApplication(root, init3(flags), update4, view2);
     return new Ok((action) => app.send(action));
   }
   /**
@@ -2451,10 +2673,10 @@ var LustreClientApplication = class _LustreClientApplication {
    *
    * @returns {LustreClientApplication}
    */
-  constructor(root, [init3, effects], update2, view2) {
+  constructor(root, [init3, effects], update4, view2) {
     this.root = root;
     this.#model = init3;
-    this.#update = update2;
+    this.#update = update4;
     this.#view = view2;
     this.#tickScheduled = window.requestAnimationFrame(
       () => this.#tick(effects.all.toArray(), true)
@@ -2474,8 +2696,8 @@ var LustreClientApplication = class _LustreClientApplication {
         this.#queue = [];
         this.#model = action[0][0];
         const vdom = this.#view(this.#model);
-        const dispatch = (handler, immediate = false) => (event) => {
-          const result = handler(event);
+        const dispatch = (handler, immediate = false) => (event2) => {
+          const result = handler(event2);
           if (result instanceof Ok) {
             this.send(new Dispatch(result[0], immediate));
           }
@@ -2494,10 +2716,10 @@ var LustreClientApplication = class _LustreClientApplication {
         this.#tickScheduled = window.requestAnimationFrame(() => this.#tick());
       }
     } else if (action instanceof Emit2) {
-      const event = action[0];
+      const event2 = action[0];
       const data = action[1];
       this.root.dispatchEvent(
-        new CustomEvent(event, {
+        new CustomEvent(event2, {
           detail: data,
           bubbles: true,
           composed: true
@@ -2531,8 +2753,8 @@ var LustreClientApplication = class _LustreClientApplication {
     this.#tickScheduled = void 0;
     this.#flush(effects);
     const vdom = this.#view(this.#model);
-    const dispatch = (handler, immediate = false) => (event) => {
-      const result = handler(event);
+    const dispatch = (handler, immediate = false) => (event2) => {
+      const result = handler(event2);
       if (result instanceof Ok) {
         this.send(new Dispatch(result[0], immediate));
       }
@@ -2550,8 +2772,8 @@ var LustreClientApplication = class _LustreClientApplication {
     while (effects.length > 0) {
       const effect = effects.shift();
       const dispatch = (msg) => this.send(new Dispatch(msg));
-      const emit2 = (event, data) => this.root.dispatchEvent(
-        new CustomEvent(event, {
+      const emit2 = (event2, data) => this.root.dispatchEvent(
+        new CustomEvent(event2, {
           detail: data,
           bubbles: true,
           composed: true
@@ -2569,18 +2791,18 @@ var LustreClientApplication = class _LustreClientApplication {
 };
 var start = LustreClientApplication.start;
 var LustreServerApplication = class _LustreServerApplication {
-  static start({ init: init3, update: update2, view: view2, on_attribute_change }, flags) {
+  static start({ init: init3, update: update4, view: view2, on_attribute_change }, flags) {
     const app = new _LustreServerApplication(
       init3(flags),
-      update2,
+      update4,
       view2,
       on_attribute_change
     );
     return new Ok((action) => app.send(action));
   }
-  constructor([model, effects], update2, view2, on_attribute_change) {
+  constructor([model, effects], update4, view2, on_attribute_change) {
     this.#model = model;
-    this.#update = update2;
+    this.#update = update4;
     this.#view = view2;
     this.#html = view2(model);
     this.#onAttributeChange = on_attribute_change;
@@ -2608,9 +2830,9 @@ var LustreServerApplication = class _LustreServerApplication {
       this.#queue.push(action[0]);
       this.#tick();
     } else if (action instanceof Emit2) {
-      const event = new Emit(action[0], action[1]);
+      const event2 = new Emit(action[0], action[1]);
       for (const [_, renderer] of this.#renderers) {
-        renderer(event);
+        renderer(event2);
       }
     } else if (action instanceof Event2) {
       const handler = this.#handlers.get(action[0]);
@@ -2661,8 +2883,8 @@ var LustreServerApplication = class _LustreServerApplication {
     while (effects.length > 0) {
       const effect = effects.shift();
       const dispatch = (msg) => this.send(new Dispatch(msg));
-      const emit2 = (event, data) => this.root.dispatchEvent(
-        new CustomEvent(event, {
+      const emit2 = (event2, data) => this.root.dispatchEvent(
+        new CustomEvent(event2, {
           detail: data,
           bubbles: true,
           composed: true
@@ -2683,10 +2905,10 @@ var is_browser = () => globalThis.window && window.document;
 
 // build/dev/javascript/lustre/lustre.mjs
 var App = class extends CustomType {
-  constructor(init3, update2, view2, on_attribute_change) {
+  constructor(init3, update4, view2, on_attribute_change) {
     super();
     this.init = init3;
-    this.update = update2;
+    this.update = update4;
     this.view = view2;
     this.on_attribute_change = on_attribute_change;
   }
@@ -2699,8 +2921,8 @@ var ElementNotFound = class extends CustomType {
 };
 var NotABrowser = class extends CustomType {
 };
-function application(init3, update2, view2) {
-  return new App(init3, update2, view2, new None());
+function application(init3, update4, view2) {
+  return new App(init3, update4, view2, new None());
 }
 function start2(app, selector, flags) {
   return guard(
@@ -2713,11 +2935,137 @@ function start2(app, selector, flags) {
 }
 
 // build/dev/javascript/lustre/lustre/element/html.mjs
+function text2(content) {
+  return text(content);
+}
 function div(attrs, children2) {
   return element("div", attrs, children2);
 }
 function canvas(attrs) {
   return element("canvas", attrs, toList([]));
+}
+function input(attrs) {
+  return element("input", attrs, toList([]));
+}
+function label(attrs, children2) {
+  return element("label", attrs, children2);
+}
+
+// build/dev/javascript/lustre/lustre/event.mjs
+function on2(name, handler) {
+  return on(name, handler);
+}
+function checked2(event2) {
+  let _pipe = event2;
+  return field("target", field("checked", bool))(
+    _pipe
+  );
+}
+function on_check(msg) {
+  return on2(
+    "change",
+    (event2) => {
+      let _pipe = checked2(event2);
+      return map2(_pipe, msg);
+    }
+  );
+}
+
+// build/dev/javascript/gleam_stdlib/gleam/io.mjs
+function debug(term) {
+  let _pipe = term;
+  let _pipe$1 = inspect2(_pipe);
+  print_debug(_pipe$1);
+  return term;
+}
+
+// build/dev/javascript/client/client_lib_engine_ffi.mjs
+function request_animation_frame(cb) {
+  window.requestAnimationFrame(cb);
+}
+function with_keyboard_data(cb) {
+  return function listener(e) {
+    return cb({
+      key: e.key,
+      alt_key: e.altKey,
+      ctrl_key: e.ctrlKey,
+      meta_key: e.metaKey,
+      repeat: e.repeat,
+      shift_key: e.shiftKey
+    });
+  };
+}
+function add_keyboard_event_listener(cb) {
+  return window.addEventListener("keydown", with_keyboard_data(cb));
+}
+
+// build/dev/javascript/client/lib/input.mjs
+var UpKey = class extends CustomType {
+};
+var DownKey = class extends CustomType {
+};
+var LeftKey = class extends CustomType {
+};
+var RightKey = class extends CustomType {
+};
+function decode_game_key(event2) {
+  let key = (() => {
+    let $ = event2.key;
+    if ($ === "ArrowUp") {
+      return new Ok(new UpKey());
+    } else if ($ === "w") {
+      return new Ok(new UpKey());
+    } else if ($ === "ArrowDown") {
+      return new Ok(new DownKey());
+    } else if ($ === "s") {
+      return new Ok(new DownKey());
+    } else if ($ === "ArrowLeft") {
+      return new Ok(new LeftKey());
+    } else if ($ === "a") {
+      return new Ok(new LeftKey());
+    } else if ($ === "ArrowRight") {
+      return new Ok(new RightKey());
+    } else if ($ === "d") {
+      return new Ok(new RightKey());
+    } else {
+      return new Error("Unsupported key");
+    }
+  })();
+  return debug(key);
+}
+function on_keyboard_event(cb) {
+  return add_keyboard_event_listener(
+    (event2) => {
+      let $ = decode_game_key(event2);
+      if ($.isOk()) {
+        let game_key = $[0];
+        return cb(game_key);
+      } else {
+        return void 0;
+      }
+    }
+  );
+}
+
+// build/dev/javascript/client/lib/direction.mjs
+var Up = class extends CustomType {
+};
+var Down = class extends CustomType {
+};
+var Right = class extends CustomType {
+};
+var Left = class extends CustomType {
+};
+function from_game_key(game_key) {
+  if (game_key instanceof UpKey) {
+    return new Up();
+  } else if (game_key instanceof DownKey) {
+    return new Down();
+  } else if (game_key instanceof LeftKey) {
+    return new Left();
+  } else {
+    return new Right();
+  }
 }
 
 // build/dev/javascript/client/lib/coord.mjs
@@ -2730,13 +3078,33 @@ var Coord = class extends CustomType {
   }
 };
 function at(x3, y3, z) {
-  return new Coord(max(x3, 0), max(y3, 0), z);
+  return new Coord(x3, y3, z);
+}
+function move(from2, by) {
+  return new Coord(max(from2.x + by.x, 0), max(from2.y + by.y, 0), by.z);
+}
+function elevate(from2, z) {
+  return move(from2, new Coord(0, 0, max(z, 0)));
 }
 function sum(coord) {
   return coord.x + coord.y * 10;
 }
 function compare3(a, b) {
   return compare(sum(a), sum(b));
+}
+function equal(a, b) {
+  return a.x === b.x && a.y === b.y && a.z === b.z;
+}
+function from_direction(direction) {
+  if (direction instanceof Up) {
+    return at(0, -1, 0);
+  } else if (direction instanceof Down) {
+    return at(0, 1, 0);
+  } else if (direction instanceof Left) {
+    return at(-1, 0, 0);
+  } else {
+    return at(1, 0, 0);
+  }
 }
 
 // build/dev/javascript/client/lib/math.mjs
@@ -2788,8 +3156,8 @@ function get_viewport(camera, scale2) {
     )
   ];
 }
-var width2 = 640;
-var height2 = 360;
+var width2 = 320;
+var height2 = 180;
 function new$3(focus) {
   return new Camera(focus, width2, height2);
 }
@@ -2831,92 +3199,6 @@ function load_image(src) {
   return image;
 }
 
-// build/dev/javascript/client/client_lib_engine_ffi.mjs
-function request_animation_frame(cb) {
-  window.requestAnimationFrame(cb);
-}
-function with_keyboard_data(cb) {
-  return function listener(e) {
-    return cb({
-      key: e.key,
-      alt_key: e.altKey,
-      ctrl_key: e.ctrlKey,
-      meta_key: e.metaKey,
-      repeat: e.repeat,
-      shift_key: e.shiftKey
-    });
-  };
-}
-function add_keyboard_event_listener(cb) {
-  return window.addEventListener("keydown", with_keyboard_data(cb));
-}
-
-// build/dev/javascript/client/lib/input.mjs
-var UpKey = class extends CustomType {
-};
-var DownKey = class extends CustomType {
-};
-var LeftKey = class extends CustomType {
-};
-var RightKey = class extends CustomType {
-};
-function decode_game_key(event) {
-  let $ = event.key;
-  if ($ === "ArrowUp") {
-    return new Ok(new UpKey());
-  } else if ($ === "w") {
-    return new Ok(new UpKey());
-  } else if ($ === "ArrowDown") {
-    return new Ok(new DownKey());
-  } else if ($ === "s") {
-    return new Ok(new DownKey());
-  } else if ($ === "ArrowLeft") {
-    return new Ok(new LeftKey());
-  } else if ($ === "a") {
-    return new Ok(new LeftKey());
-  } else if ($ === "ArrowRight") {
-    return new Ok(new RightKey());
-  } else if ($ === "d") {
-    return new Ok(new RightKey());
-  } else {
-    return new Error("Unsupported key");
-  }
-}
-function on_keyboard_event(cb) {
-  return add_keyboard_event_listener(
-    (event) => {
-      let $ = decode_game_key(event);
-      if ($.isOk()) {
-        let game_key = $[0];
-        return cb(game_key);
-      } else {
-        return void 0;
-      }
-    }
-  );
-}
-
-// build/dev/javascript/client/lib/direction.mjs
-var Up = class extends CustomType {
-};
-var Down = class extends CustomType {
-};
-var Right = class extends CustomType {
-};
-var Left = class extends CustomType {
-};
-function from_game_key(game_key) {
-  if (game_key instanceof UpKey) {
-    return new Up();
-  } else if (game_key instanceof DownKey) {
-    return new Down();
-  } else if (game_key instanceof LeftKey) {
-    return new Left();
-  } else {
-    return new Right();
-  }
-}
-
 // build/dev/javascript/client/lib/vector.mjs
 var Vector = class extends CustomType {
   constructor(x3, y3) {
@@ -2925,9 +3207,6 @@ var Vector = class extends CustomType {
     this.y = y3;
   }
 };
-function new$4() {
-  return new Vector(0, 0);
-}
 function at2(x3, y3) {
   return new Vector(x3, y3);
 }
@@ -2937,22 +3216,8 @@ function x(vec) {
 function y(vec) {
   return vec.y;
 }
-function move(from2, by) {
-  return at2(add2(from2.x, by.x), add2(from2.y, by.y));
-}
-function from_direction(direction) {
-  if (direction instanceof Up) {
-    return at2(0, -1);
-  } else if (direction instanceof Down) {
-    return at2(0, 1);
-  } else if (direction instanceof Left) {
-    return at2(-1, 0);
-  } else {
-    return at2(1, 0);
-  }
-}
-var half_width = 32;
-var half_height = 16;
+var half_width = 16;
+var half_height = 8;
 function from_coord(coords, camera) {
   let dx = coords.x - camera.focus.x;
   let dy = coords.y - camera.focus.y;
@@ -2972,40 +3237,6 @@ function from_coord(coords, camera) {
   );
 }
 
-// build/dev/javascript/client/lib/cursor.mjs
-var CursorIdle = class extends CustomType {
-  constructor(elapsed, cycle, amplitude) {
-    super();
-    this.elapsed = elapsed;
-    this.cycle = cycle;
-    this.amplitude = amplitude;
-  }
-};
-var CursorMoving = class extends CustomType {
-  constructor(start3, target, elapsed, duration) {
-    super();
-    this.start = start3;
-    this.target = target;
-    this.elapsed = elapsed;
-    this.duration = duration;
-  }
-};
-var cursor_idle_info = /* @__PURE__ */ new CursorIdle(0, 0.75, 1);
-function new_idle_cursor() {
-  return cursor_idle_info;
-}
-
-// build/dev/javascript/client/lib/event.mjs
-var MoveCursor = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
-function new_queue() {
-  return toList([]);
-}
-
 // build/dev/javascript/client/lib/sprite.mjs
 var SpriteRegion = class extends CustomType {
   constructor(x3, y3) {
@@ -3015,11 +3246,11 @@ var SpriteRegion = class extends CustomType {
   }
 };
 var SpriteSheet = class extends CustomType {
-  constructor(asset, grid, sprites2) {
+  constructor(asset, grid, sprites3) {
     super();
     this.asset = asset;
     this.grid = grid;
-    this.sprites = sprites2;
+    this.sprites = sprites3;
   }
 };
 function x2(sr, grid) {
@@ -3057,18 +3288,117 @@ function render(context, sheet, sprite_region, at3, scale2) {
       return scale(_pipe, scale2);
     })(),
     (() => {
-      let _pipe = 64;
-      return scale(_pipe, scale2);
+      let _pipe = sheet.grid;
+      let _pipe$1 = identity(_pipe);
+      return scale(_pipe$1, scale2);
     })(),
     (() => {
-      let _pipe = 64;
-      return scale(_pipe, scale2);
+      let _pipe = sheet.grid;
+      let _pipe$1 = identity(_pipe);
+      return scale(_pipe$1, scale2);
     })()
   );
 }
 
-// build/dev/javascript/client/lib/asset/demo.mjs
+// build/dev/javascript/client/lib/asset/cursor.mjs
 var Base = class extends CustomType {
+};
+function get_sprite_key(variant) {
+  if (variant instanceof Base) {
+    return "Base";
+  } else {
+    return "Pointer";
+  }
+}
+var sprites = /* @__PURE__ */ toList([
+  ["Base", /* @__PURE__ */ new SpriteRegion(0, 0)],
+  ["Pointer", /* @__PURE__ */ new SpriteRegion(1, 0)]
+]);
+function sprite_sheet() {
+  return new SpriteSheet(
+    load_image(
+      "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/cursor.png"
+    ),
+    32,
+    from_list(sprites)
+  );
+}
+
+// build/dev/javascript/client/lib/constants.mjs
+function fixed_dt() {
+  return 16.67;
+}
+function max_update_frames() {
+  return 6;
+}
+
+// build/dev/javascript/client/lib/cursor.mjs
+var Cursor = class extends CustomType {
+  constructor(position, sprite_sheet3, animation) {
+    super();
+    this.position = position;
+    this.sprite_sheet = sprite_sheet3;
+    this.animation = animation;
+  }
+};
+var CursorAnimation = class extends CustomType {
+  constructor(elapsed, cycle, amplitude) {
+    super();
+    this.elapsed = elapsed;
+    this.cycle = cycle;
+    this.amplitude = amplitude;
+  }
+};
+function update(cursor) {
+  let updated_elapsed = (() => {
+    let _pipe = cursor.animation.elapsed;
+    let _pipe$1 = add2(_pipe, fixed_dt());
+    let _pipe$2 = modulo(_pipe$1, cursor.animation.cycle);
+    return unwrap(_pipe$2, 0);
+  })();
+  return cursor.withFields({
+    animation: cursor.animation.withFields({ elapsed: updated_elapsed })
+  });
+}
+function render_base(context, cursor, coords, camera, scale2) {
+  let $ = equal(cursor.position, coords);
+  if (!$) {
+    return void 0;
+  } else {
+    let region = (() => {
+      let _pipe = get_sprite_key(new Base());
+      return ((_capture) => {
+        return map_get(cursor.sprite_sheet.sprites, _capture);
+      })(_pipe);
+    })();
+    if (region.isOk()) {
+      let region$1 = region[0];
+      let vector = from_coord(coords, camera);
+      render(context, cursor.sprite_sheet, region$1, vector, scale2);
+      return void 0;
+    } else {
+      return void 0;
+    }
+  }
+}
+var cursor_animation = /* @__PURE__ */ new CursorAnimation(0, 0.75, 1);
+function new$4(position) {
+  return new Cursor(position, sprite_sheet(), cursor_animation);
+}
+
+// build/dev/javascript/client/lib/event.mjs
+var MoveCursor = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+function new_queue() {
+  return toList([]);
+}
+
+// build/dev/javascript/client/lib/asset/demo.mjs
+var Base2 = class extends CustomType {
 };
 var Variant1 = class extends CustomType {
 };
@@ -3082,8 +3412,8 @@ var Variant5 = class extends CustomType {
 };
 var Variant6 = class extends CustomType {
 };
-function get_sprite_key(variant) {
-  if (variant instanceof Base) {
+function get_sprite_key2(variant) {
+  if (variant instanceof Base2) {
     return "Base";
   } else if (variant instanceof Variant1) {
     return "Variant1";
@@ -3099,7 +3429,7 @@ function get_sprite_key(variant) {
     return "Variant6";
   }
 }
-var sprites = /* @__PURE__ */ toList([
+var sprites2 = /* @__PURE__ */ toList([
   ["Base", /* @__PURE__ */ new SpriteRegion(0, 0)],
   ["Variant1", /* @__PURE__ */ new SpriteRegion(1, 0)],
   ["Variant2", /* @__PURE__ */ new SpriteRegion(2, 0)],
@@ -3108,22 +3438,23 @@ var sprites = /* @__PURE__ */ toList([
   ["Variant5", /* @__PURE__ */ new SpriteRegion(5, 0)],
   ["Variant6", /* @__PURE__ */ new SpriteRegion(6, 0)]
 ]);
-function sprite_sheet() {
+function sprite_sheet2() {
   return new SpriteSheet(
     load_image(
       "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/color-test-tiles.png"
     ),
-    64,
-    from_list(sprites)
+    32,
+    from_list(sprites2)
   );
 }
 
 // build/dev/javascript/client/lib/tile.mjs
 var Tile = class extends CustomType {
-  constructor(tileset, passability) {
+  constructor(tileset, passability, elevation) {
     super();
     this.tileset = tileset;
     this.passability = passability;
+    this.elevation = elevation;
   }
 };
 var Demo = class extends CustomType {
@@ -3134,11 +3465,11 @@ var Demo = class extends CustomType {
 };
 var Passable = class extends CustomType {
 };
-function get_sprite(sprite_sheet2, tileset) {
+function get_sprite(sprite_sheet3, tileset) {
   let sprite_key = (() => {
     if (tileset instanceof Demo) {
       let variant = tileset[0];
-      return new Ok(get_sprite_key(variant));
+      return new Ok(get_sprite_key2(variant));
     } else {
       return new Error(void 0);
     }
@@ -3147,16 +3478,27 @@ function get_sprite(sprite_sheet2, tileset) {
   return try$(
     _pipe,
     (_capture) => {
-      return map_get(sprite_sheet2.sprites, _capture);
+      return map_get(sprite_sheet3.sprites, _capture);
     }
   );
+}
+function render2(context, tile, coords, sprite_sheet3, camera, scale2) {
+  let sprite_region = get_sprite(sprite_sheet3, tile.tileset);
+  if (sprite_region.isOk()) {
+    let region = sprite_region[0];
+    let vector = from_coord(coords, camera);
+    render(context, sprite_sheet3, region, vector, scale2);
+    return void 0;
+  } else {
+    return void 0;
+  }
 }
 
 // build/dev/javascript/client/lib/map.mjs
 var Map3 = class extends CustomType {
-  constructor(sprite_sheet2, tiles) {
+  constructor(sprite_sheet3, tiles) {
     super();
-    this.sprite_sheet = sprite_sheet2;
+    this.sprite_sheet = sprite_sheet3;
     this.tiles = tiles;
   }
 };
@@ -3173,121 +3515,217 @@ function each_tile(map4, f) {
     _pipe$2,
     (tile_pair) => {
       let coords = first(tile_pair);
-      let tile = second(tile_pair);
-      return f(coords, tile);
+      let t = second(tile_pair);
+      return f(elevate(coords, t.elevation), t);
     }
   );
 }
 
 // build/dev/javascript/client/lib/engine.mjs
 var GameState = class extends CustomType {
-  constructor(accumulator, camera, cursor, cursor_animation, event_queue, fps, map4, previous_time, scale2) {
+  constructor(accumulator, camera, cursor, event_queue, fps, map4, previous_time, scale2, debug2) {
     super();
     this.accumulator = accumulator;
     this.camera = camera;
     this.cursor = cursor;
-    this.cursor_animation = cursor_animation;
     this.event_queue = event_queue;
     this.fps = fps;
     this.map = map4;
     this.previous_time = previous_time;
     this.scale = scale2;
+    this.debug = debug2;
   }
 };
 function new$5(init3, map4) {
   return new GameState(
     0,
-    new$3(at(4, 3, 0)),
-    new$4(),
-    new_idle_cursor(),
+    new$3(at(4, 3, 2)),
+    new$4(at(4, 3, 2)),
     new_queue(),
     0,
     map4,
     init3,
-    new Double()
+    new Double(),
+    false
   );
 }
-
-// build/dev/javascript/client/lib/frames.mjs
-var dt_s = 0.01667;
-function to_duration(count) {
-  return multiply(dt_s, count);
+function calc_frame_time(game_state, current_time) {
+  return subtract(current_time, game_state.previous_time);
+}
+function update_time(game_state, current_time) {
+  let time_since_last_frame = calc_frame_time(game_state, current_time);
+  let accumulator = add2(game_state.accumulator, time_since_last_frame);
+  let fps = (() => {
+    let $ = divide(1e3, time_since_last_frame);
+    if ($.isOk()) {
+      let fps2 = $[0];
+      return fps2;
+    } else {
+      return 60;
+    }
+  })();
+  return game_state.withFields({
+    accumulator,
+    fps,
+    previous_time: current_time
+  });
+}
+function reset_events(game_state) {
+  return game_state.withFields({ event_queue: toList([]) });
+}
+function apply_events(game_state) {
+  let _pipe = fold_right(
+    game_state.event_queue,
+    game_state,
+    (acc, event2) => {
+      {
+        let direction = event2[0];
+        let position = (() => {
+          let _pipe2 = direction;
+          let _pipe$1 = from_direction(_pipe2);
+          let _pipe$2 = move(_pipe$1, acc.cursor.position);
+          return elevate(_pipe$2, 0);
+        })();
+        let $ = map_get(game_state.map.tiles, position);
+        if ($.isOk()) {
+          let t = $[0];
+          let $1 = t.passability;
+          if ($1 instanceof Passable) {
+            return game_state.withFields({
+              cursor: game_state.cursor.withFields({
+                position: elevate(position, t.elevation)
+              })
+            });
+          } else {
+            return game_state;
+          }
+        } else {
+          return game_state;
+        }
+      }
+    }
+  );
+  return reset_events(_pipe);
+}
+function is_gt_or_eq(order) {
+  if (order instanceof Lt) {
+    return false;
+  } else {
+    return true;
+  }
+}
+function update_entities(game_state) {
+  let new_cursor = update(game_state.cursor);
+  return game_state.withFields({ cursor: new_cursor });
+}
+function update_loop(loop$game_state, loop$accumulator, loop$loop_count) {
+  while (true) {
+    let game_state = loop$game_state;
+    let accumulator = loop$accumulator;
+    let loop_count = loop$loop_count;
+    let has_pending_frames = (() => {
+      let _pipe = compare2(accumulator, fixed_dt());
+      return is_gt_or_eq(_pipe);
+    })();
+    let $ = has_pending_frames && loop_count <= max_update_frames();
+    if ($) {
+      let _pipe = game_state;
+      let _pipe$1 = apply_events(_pipe);
+      let _pipe$2 = update_entities(_pipe$1);
+      loop$game_state = _pipe$2;
+      loop$accumulator = subtract(accumulator, fixed_dt());
+      loop$loop_count = loop_count + 1;
+    } else {
+      return game_state.withFields({ accumulator });
+    }
+  }
+}
+function update2(game_state, current_time) {
+  let updated = update_time(game_state, current_time);
+  return update_loop(updated, updated.accumulator, 0);
+}
+function toggle_debug(game_state) {
+  return game_state.withFields({ debug: !game_state.debug });
 }
 
 // build/dev/javascript/client/lib/map/demo_one.mjs
-function new_tile(variant) {
-  return new Tile(new Demo(variant), new Passable());
+function new_tile(variant, elevation) {
+  return new Tile(
+    new Demo(variant),
+    new Passable(),
+    elevation
+  );
 }
 function new$6() {
   let tiles = from_list(
     toList([
-      [at(0, 0, 0), new_tile(new Base())],
-      [at(1, 0, 0), new_tile(new Variant1())],
-      [at(2, 0, 0), new_tile(new Variant6())],
-      [at(3, 0, 0), new_tile(new Base())],
-      [at(4, 0, 0), new_tile(new Variant4())],
-      [at(5, 0, 0), new_tile(new Variant5())],
-      [at(6, 0, 0), new_tile(new Variant2())],
-      [at(7, 0, 0), new_tile(new Base())],
-      [at(0, 1, 0), new_tile(new Variant3())],
-      [at(1, 1, 0), new_tile(new Variant4())],
-      [at(2, 1, 0), new_tile(new Base())],
-      [at(3, 1, 0), new_tile(new Variant5())],
-      [at(4, 1, 0), new_tile(new Variant1())],
-      [at(5, 1, 0), new_tile(new Base())],
-      [at(6, 1, 0), new_tile(new Variant6())],
-      [at(7, 1, 0), new_tile(new Variant2())],
-      [at(0, 2, 0), new_tile(new Variant2())],
-      [at(1, 2, 0), new_tile(new Base())],
-      [at(2, 2, 0), new_tile(new Base())],
-      [at(3, 2, 0), new_tile(new Variant1())],
-      [at(4, 2, 0), new_tile(new Variant1())],
-      [at(5, 2, 0), new_tile(new Base())],
-      [at(6, 2, 0), new_tile(new Variant3())],
-      [at(7, 2, 0), new_tile(new Base())],
-      [at(0, 3, 0), new_tile(new Base())],
-      [at(1, 3, 0), new_tile(new Variant4())],
-      [at(2, 3, 0), new_tile(new Base())],
-      [at(3, 3, 0), new_tile(new Variant1())],
-      [at(4, 3, 0), new_tile(new Variant3())],
-      [at(5, 3, 0), new_tile(new Base())],
-      [at(6, 3, 0), new_tile(new Base())],
-      [at(7, 3, 0), new_tile(new Variant2())],
-      [at(0, 4, 0), new_tile(new Variant3())],
-      [at(1, 4, 0), new_tile(new Base())],
-      [at(2, 4, 0), new_tile(new Variant4())],
-      [at(3, 4, 0), new_tile(new Base())],
-      [at(4, 4, 0), new_tile(new Variant5())],
-      [at(5, 4, 0), new_tile(new Base())],
-      [at(6, 4, 0), new_tile(new Base())],
-      [at(7, 4, 0), new_tile(new Variant1())],
-      [at(0, 5, 0), new_tile(new Base())],
-      [at(1, 5, 0), new_tile(new Variant1())],
-      [at(2, 5, 0), new_tile(new Base())],
-      [at(3, 5, 0), new_tile(new Variant3())],
-      [at(4, 5, 0), new_tile(new Base())],
-      [at(5, 5, 0), new_tile(new Variant2())],
-      [at(6, 5, 0), new_tile(new Variant5())],
-      [at(7, 5, 0), new_tile(new Base())],
-      [at(0, 6, 0), new_tile(new Variant4())],
-      [at(1, 6, 0), new_tile(new Variant2())],
-      [at(2, 6, 0), new_tile(new Base())],
-      [at(3, 6, 0), new_tile(new Base())],
-      [at(4, 6, 0), new_tile(new Variant5())],
-      [at(5, 6, 0), new_tile(new Base())],
-      [at(6, 6, 0), new_tile(new Variant6())],
-      [at(7, 6, 0), new_tile(new Base())],
-      [at(0, 7, 0), new_tile(new Variant6())],
-      [at(1, 7, 0), new_tile(new Base())],
-      [at(2, 7, 0), new_tile(new Variant1())],
-      [at(3, 7, 0), new_tile(new Variant4())],
-      [at(4, 7, 0), new_tile(new Base())],
-      [at(5, 7, 0), new_tile(new Base())],
-      [at(6, 7, 0), new_tile(new Base())],
-      [at(7, 7, 0), new_tile(new Variant2())]
+      [at(0, 0, 0), new_tile(new Base2(), 0)],
+      [at(1, 0, 0), new_tile(new Variant1(), 0)],
+      [at(2, 0, 0), new_tile(new Variant6(), 0)],
+      [at(3, 0, 0), new_tile(new Base2(), 0)],
+      [at(4, 0, 0), new_tile(new Variant4(), 0)],
+      [at(5, 0, 0), new_tile(new Variant5(), 0)],
+      [at(6, 0, 0), new_tile(new Variant2(), 0)],
+      [at(7, 0, 0), new_tile(new Base2(), 0)],
+      [at(0, 1, 0), new_tile(new Variant3(), 0)],
+      [at(1, 1, 0), new_tile(new Variant4(), 0)],
+      [at(2, 1, 0), new_tile(new Base2(), 0)],
+      [at(3, 1, 0), new_tile(new Variant5(), 0)],
+      [at(4, 1, 0), new_tile(new Variant1(), 0)],
+      [at(5, 1, 0), new_tile(new Base2(), 0)],
+      [at(6, 1, 0), new_tile(new Variant6(), 0)],
+      [at(7, 1, 0), new_tile(new Variant2(), 0)],
+      [at(0, 2, 0), new_tile(new Variant2(), 0)],
+      [at(1, 2, 0), new_tile(new Base2(), 0)],
+      [at(2, 2, 0), new_tile(new Base2(), 1)],
+      [at(3, 2, 0), new_tile(new Variant1(), 1)],
+      [at(4, 2, 0), new_tile(new Variant1(), 1)],
+      [at(5, 2, 0), new_tile(new Base2(), 1)],
+      [at(6, 2, 0), new_tile(new Variant3(), 0)],
+      [at(7, 2, 0), new_tile(new Base2(), 0)],
+      [at(0, 3, 0), new_tile(new Base2(), 0)],
+      [at(1, 3, 0), new_tile(new Variant4(), 0)],
+      [at(2, 3, 0), new_tile(new Base2(), 1)],
+      [at(3, 3, 0), new_tile(new Variant1(), 2)],
+      [at(4, 3, 0), new_tile(new Variant3(), 2)],
+      [at(5, 3, 0), new_tile(new Base2(), 1)],
+      [at(6, 3, 0), new_tile(new Base2(), 0)],
+      [at(7, 3, 0), new_tile(new Variant2(), 0)],
+      [at(0, 4, 0), new_tile(new Variant3(), 0)],
+      [at(1, 4, 0), new_tile(new Base2(), 0)],
+      [at(2, 4, 0), new_tile(new Variant4(), 1)],
+      [at(3, 4, 0), new_tile(new Base2(), 2)],
+      [at(4, 4, 0), new_tile(new Variant5(), 2)],
+      [at(5, 4, 0), new_tile(new Base2(), 1)],
+      [at(6, 4, 0), new_tile(new Base2(), 0)],
+      [at(7, 4, 0), new_tile(new Variant1(), 0)],
+      [at(0, 5, 0), new_tile(new Base2(), 0)],
+      [at(1, 5, 0), new_tile(new Variant1(), 0)],
+      [at(2, 5, 0), new_tile(new Base2(), 1)],
+      [at(3, 5, 0), new_tile(new Variant3(), 1)],
+      [at(4, 5, 0), new_tile(new Base2(), 1)],
+      [at(5, 5, 0), new_tile(new Variant2(), 1)],
+      [at(6, 5, 0), new_tile(new Variant5(), 0)],
+      [at(7, 5, 0), new_tile(new Base2(), 0)],
+      [at(0, 6, 0), new_tile(new Variant4(), 0)],
+      [at(1, 6, 0), new_tile(new Variant2(), 0)],
+      [at(2, 6, 0), new_tile(new Base2(), 0)],
+      [at(3, 6, 0), new_tile(new Base2(), 0)],
+      [at(4, 6, 0), new_tile(new Variant5(), 0)],
+      [at(5, 6, 0), new_tile(new Base2(), 0)],
+      [at(6, 6, 0), new_tile(new Variant6(), 0)],
+      [at(7, 6, 0), new_tile(new Base2(), 0)],
+      [at(0, 7, 0), new_tile(new Variant6(), 0)],
+      [at(1, 7, 0), new_tile(new Base2(), 0)],
+      [at(2, 7, 0), new_tile(new Variant1(), 0)],
+      [at(3, 7, 0), new_tile(new Variant4(), 0)],
+      [at(4, 7, 0), new_tile(new Base2(), 0)],
+      [at(5, 7, 0), new_tile(new Base2(), 0)],
+      [at(6, 7, 0), new_tile(new Base2(), 0)],
+      [at(7, 7, 0), new_tile(new Variant2(), 0)]
     ])
   );
-  return new Map3(sprite_sheet(), tiles);
+  return new Map3(sprite_sheet2(), tiles);
 }
 
 // build/dev/javascript/client/lib/render.mjs
@@ -3322,13 +3760,9 @@ var Ready = class extends CustomType {
     this.game_state = game_state;
   }
 };
-var AppInitEngine = class extends CustomType {
-  constructor(x0) {
-    super();
-    this[0] = x0;
-  }
-};
 var AppSetNoCanvas = class extends CustomType {
+};
+var ToggleDebug = class extends CustomType {
 };
 var Tick = class extends CustomType {
   constructor(x0) {
@@ -3356,91 +3790,6 @@ function setup_listeners() {
     }
   );
 }
-function run_logic_update(game_state, dt_seconds) {
-  let new_cursor_animation = (() => {
-    let $ = game_state.cursor_animation;
-    if ($ instanceof CursorIdle) {
-      let elapsed = $.elapsed;
-      let cycle = $.cycle;
-      let amplitude = $.amplitude;
-      let looped_elapsed = (() => {
-        let _pipe = elapsed;
-        let _pipe$1 = add2(_pipe, dt_seconds);
-        let _pipe$2 = modulo(_pipe$1, cycle);
-        return unwrap(_pipe$2, 0);
-      })();
-      return new CursorIdle(looped_elapsed, cycle, amplitude);
-    } else {
-      let start3 = $.start;
-      let target = $.target;
-      let elapsed = $.elapsed;
-      let duration = $.duration;
-      let new_elapsed = add2(elapsed, dt_seconds);
-      let $1 = compare2(new_elapsed, duration);
-      if ($1 instanceof Lt) {
-        return new CursorMoving(start3, target, new_elapsed, duration);
-      } else {
-        return new_idle_cursor();
-      }
-    }
-  })();
-  return game_state.withFields({ cursor_animation: new_cursor_animation });
-}
-function reset_events(game_state) {
-  return game_state.withFields({ event_queue: toList([]) });
-}
-function apply_events(game_state, events) {
-  let _pipe = fold_right(
-    events,
-    game_state,
-    (acc, event) => {
-      {
-        let direction = event[0];
-        let $ = game_state.cursor_animation;
-        if ($ instanceof CursorIdle) {
-          let new_cursor = (() => {
-            let _pipe2 = direction;
-            let _pipe$1 = from_direction(_pipe2);
-            return move(_pipe$1, acc.cursor);
-          })();
-          return game_state.withFields({
-            cursor: new_cursor,
-            cursor_animation: new CursorMoving(
-              game_state.cursor,
-              new_cursor,
-              0,
-              to_duration(6)
-            )
-          });
-        } else {
-          return acc;
-        }
-      }
-    }
-  );
-  return reset_events(_pipe);
-}
-function is_gt_or_eq(order) {
-  if (order instanceof Lt) {
-    return false;
-  } else {
-    return true;
-  }
-}
-function init_canvas() {
-  return from(
-    (dispatch) => {
-      return request_animation_frame(
-        (timestamp) => {
-          return dispatch(new AppInitEngine(timestamp));
-        }
-      );
-    }
-  );
-}
-function init2(_) {
-  return [new Idle(), init_canvas()];
-}
 function schedule_next_frame() {
   return from(
     (dispatch) => {
@@ -3451,6 +3800,9 @@ function schedule_next_frame() {
       );
     }
   );
+}
+function init2(_) {
+  return [new Idle(), schedule_next_frame()];
 }
 function get_canvas_dimensions(model) {
   if (model instanceof Ready) {
@@ -3481,7 +3833,20 @@ function get_canvas_dimensions(model) {
     return [640, 360];
   }
 }
-function render2(game_state) {
+function get_show_debug(model) {
+  if (model instanceof Ready) {
+    let game_state = model.game_state;
+    let $ = game_state.debug;
+    if ($) {
+      return [true, "block"];
+    } else {
+      return [false, "none"];
+    }
+  } else {
+    return [false, "none"];
+  }
+}
+function render3(game_state) {
   return from(
     (_) => {
       let $ = with_context();
@@ -3504,25 +3869,21 @@ function render2(game_state) {
             return each_tile(
               _pipe,
               (coords, tile) => {
-                let sprite_region = (() => {
-                  let _pipe$1 = game_state.map.sprite_sheet;
-                  return get_sprite(_pipe$1, tile.tileset);
-                })();
-                if (sprite_region.isOk()) {
-                  let region = sprite_region[0];
-                  let vector = from_coord(coords, game_state.camera);
-                  debug(["VECTOR: ", coords, vector]);
-                  render(
-                    context,
-                    game_state.map.sprite_sheet,
-                    region,
-                    vector,
-                    game_state.scale
-                  );
-                  return void 0;
-                } else {
-                  return void 0;
-                }
+                render2(
+                  context,
+                  tile,
+                  coords,
+                  game_state.map.sprite_sheet,
+                  game_state.camera,
+                  game_state.scale
+                );
+                return render_base(
+                  context,
+                  game_state.cursor,
+                  coords,
+                  game_state.camera,
+                  game_state.scale
+                );
               }
             );
           }
@@ -3531,7 +3892,7 @@ function render2(game_state) {
         throw makeError(
           "panic",
           "client",
-          366,
+          247,
           "",
           "`panic` expression evaluated.",
           {}
@@ -3541,12 +3902,79 @@ function render2(game_state) {
   );
 }
 function update_and_schedule(game_state) {
-  return [new Ready(game_state), batch(toList([render2(game_state)]))];
+  return [
+    new Ready(game_state),
+    batch(toList([render3(game_state), schedule_next_frame()]))
+  ];
+}
+function update3(model, msg) {
+  if (msg instanceof AppSetNoCanvas) {
+    return [new NoCanvas(), none()];
+  } else if (msg instanceof Tick) {
+    let current_time = msg[0];
+    if (model instanceof Ready) {
+      let game_state = model.game_state;
+      let _pipe = game_state;
+      let _pipe$1 = update2(_pipe, current_time);
+      return update_and_schedule(_pipe$1);
+    } else if (model instanceof Idle) {
+      return [
+        new Ready(new$5(current_time, new$6())),
+        batch(toList([setup_listeners(), schedule_next_frame()]))
+      ];
+    } else {
+      throw makeError(
+        "panic",
+        "client",
+        69,
+        "update",
+        "`panic` expression evaluated.",
+        {}
+      );
+    }
+  } else if (msg instanceof PlayerQueueEvent) {
+    let event2 = msg[0];
+    if (model instanceof Ready) {
+      let game_state = model.game_state;
+      return [
+        new Ready(
+          game_state.withFields({
+            event_queue: prepend(event2, game_state.event_queue)
+          })
+        ),
+        none()
+      ];
+    } else {
+      throw makeError(
+        "panic",
+        "client",
+        83,
+        "update",
+        "`panic` expression evaluated.",
+        {}
+      );
+    }
+  } else {
+    if (model instanceof Ready) {
+      let game_state = model.game_state;
+      return [new Ready(toggle_debug(game_state)), none()];
+    } else {
+      return [model, none()];
+    }
+  }
 }
 function view(model) {
   let $ = get_canvas_dimensions(model);
   let canvas_width = $[0];
   let canvas_height = $[1];
+  let width_px = (() => {
+    let _pipe = canvas_width;
+    return to_string(_pipe);
+  })() + "px";
+  let height_px = (() => {
+    let _pipe = canvas_height;
+    return to_string(_pipe);
+  })() + "px";
   let half_width_px = (() => {
     let _pipe = divideInt(canvas_width, 2);
     return to_string(_pipe);
@@ -3555,41 +3983,19 @@ function view(model) {
     let _pipe = divideInt(canvas_height, 2);
     return to_string(_pipe);
   })() + "px";
+  let $1 = get_show_debug(model);
+  let is_debug = $1[0];
+  let debug_display = $1[1];
   return div(
     toList([
-      style(
-        toList([
-          ["display", "flex"],
-          ["align-items", "center"],
-          ["justify-content", "center"],
-          ["width", "100vw"],
-          ["height", "100vh"]
-        ])
-      )
+      class$("flex flex-col gap-2"),
+      style(toList([["width", width_px], ["height", height_px]]))
     ]),
     toList([
       div(
         toList([
-          style(
-            toList([
-              ["position", "relative"],
-              [
-                "width",
-                (() => {
-                  let _pipe = canvas_width;
-                  return to_string(_pipe);
-                })() + "px"
-              ],
-              [
-                "height",
-                (() => {
-                  let _pipe = canvas_height;
-                  return to_string(_pipe);
-                })() + "px"
-              ],
-              ["border", "1px solid black"]
-            ])
-          )
+          class$("relative border border-gray-900"),
+          style(toList([["width", width_px], ["height", height_px]]))
         ]),
         toList([
           canvas(
@@ -3602,141 +4008,60 @@ function view(model) {
           ),
           div(
             toList([
+              class$("absolute left-0 bg-red-400/15 inset-y-0"),
               style(
-                toList([
-                  ["position", "absolute"],
-                  ["left", "0"],
-                  ["width", half_width_px],
-                  ["background", "red"],
-                  ["top", "0"],
-                  ["bottom", "0"],
-                  ["opacity", "10%"]
-                ])
+                toList([["display", debug_display], ["width", half_width_px]])
               )
             ]),
             toList([])
           ),
           div(
             toList([
+              class$(
+                "absolute left-0 bg-blue-400/15 top-0 inset-x-0"
+              ),
               style(
-                toList([
-                  ["position", "absolute"],
-                  ["left", "0"],
-                  ["height", half_height_px],
-                  ["background", "blue"],
-                  ["top", "0"],
-                  ["right", "0"],
-                  ["opacity", "10%"]
-                ])
+                toList([["display", debug_display], ["height", half_height_px]])
               )
             ]),
             toList([])
+          )
+        ])
+      ),
+      div(
+        toList([class$("flex self-start gap-2")]),
+        toList([
+          label(
+            toList([
+              class$("font-mono text-sm flex items-center gap-1")
+            ]),
+            toList([
+              input(
+                toList([
+                  class$("text-indigo-500"),
+                  type_("checkbox"),
+                  checked(is_debug),
+                  on_check((_) => {
+                    return new ToggleDebug();
+                  })
+                ])
+              ),
+              text2("Debug")
+            ])
           )
         ])
       )
     ])
   );
 }
-var fixed_dt = 16.67;
-function engine_update_loop(loop$game_state, loop$acc) {
-  while (true) {
-    let game_state = loop$game_state;
-    let acc = loop$acc;
-    let $ = (() => {
-      let _pipe = compare2(acc, fixed_dt);
-      return is_gt_or_eq(_pipe);
-    })();
-    if ($) {
-      let dt_seconds = (() => {
-        let _pipe2 = divide(fixed_dt, 1e3);
-        return unwrap(_pipe2, 0);
-      })();
-      let _pipe = game_state;
-      let _pipe$1 = apply_events(_pipe, game_state.event_queue);
-      let _pipe$2 = run_logic_update(_pipe$1, dt_seconds);
-      loop$game_state = _pipe$2;
-      loop$acc = subtract(acc, fixed_dt);
-    } else {
-      return game_state.withFields({ accumulator: 0 });
-    }
-  }
-}
-function engine_update(game_state, current_time) {
-  let frame_time = subtract(current_time, game_state.previous_time);
-  let accumulator = add2(game_state.accumulator, frame_time);
-  let fps = (() => {
-    let $ = divide(1e3, frame_time);
-    if ($.isOk()) {
-      let fps2 = $[0];
-      return fps2;
-    } else {
-      return 0;
-    }
-  })();
-  let updated_state = game_state.withFields({
-    previous_time: current_time,
-    accumulator,
-    fps
-  });
-  return engine_update_loop(updated_state, accumulator);
-}
-function update(model, msg) {
-  if (msg instanceof AppInitEngine) {
-    let previous_time = msg[0];
-    return [
-      new Ready(new$5(previous_time, new$6())),
-      batch(toList([setup_listeners(), schedule_next_frame()]))
-    ];
-  } else if (msg instanceof AppSetNoCanvas) {
-    return [new NoCanvas(), none()];
-  } else if (msg instanceof Tick) {
-    let current_time = msg[0];
-    if (model instanceof Ready) {
-      let game_state = model.game_state;
-      let _pipe = engine_update(game_state, current_time);
-      return update_and_schedule(_pipe);
-    } else {
-      throw makeError(
-        "panic",
-        "client",
-        78,
-        "update",
-        "`panic` expression evaluated.",
-        {}
-      );
-    }
-  } else {
-    let event = msg[0];
-    if (model instanceof Ready) {
-      let game_state = model.game_state;
-      return [
-        new Ready(
-          game_state.withFields({
-            event_queue: prepend(event, game_state.event_queue)
-          })
-        ),
-        none()
-      ];
-    } else {
-      throw makeError(
-        "panic",
-        "client",
-        92,
-        "update",
-        "`panic` expression evaluated.",
-        {}
-      );
-    }
-  }
-}
 function main() {
-  let app = application(init2, update, view);
+  let app = application(init2, update3, view);
   let $ = start2(app, "#app", void 0);
   if (!$.isOk()) {
     throw makeError(
       "let_assert",
       "client",
-      36,
+      29,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }

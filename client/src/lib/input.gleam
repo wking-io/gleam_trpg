@@ -1,3 +1,5 @@
+import gleam/io
+
 pub type GameKey {
   UpKey
   DownKey
@@ -17,13 +19,14 @@ pub type KeyboardEvent {
 }
 
 fn decode_game_key(event: KeyboardEvent) -> Result(GameKey, String) {
-  case event.key {
+  let key = case event.key {
     "ArrowUp" | "w" -> Ok(UpKey)
     "ArrowDown" | "s" -> Ok(DownKey)
     "ArrowLeft" | "a" -> Ok(LeftKey)
     "ArrowRight" | "d" -> Ok(RightKey)
     _ -> Error("Unsupported key")
   }
+  io.debug(key)
 }
 
 pub fn on_keyboard_event(cb: fn(GameKey) -> Nil) -> Nil {

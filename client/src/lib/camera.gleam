@@ -6,9 +6,9 @@ pub type Camera {
   Camera(focus: coord.Coord, width: Int, height: Int)
 }
 
-const width = 640
+const width = 320
 
-const height = 360
+const height = 180
 
 pub fn new(focus: coord.Coord) {
   Camera(focus:, width: width, height: height)
