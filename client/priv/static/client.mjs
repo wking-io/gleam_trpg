@@ -3083,7 +3083,10 @@ function at(x3, y3, z) {
 function move(from2, by) {
   return new Coord(max(from2.x + by.x, 0), max(from2.y + by.y, 0), by.z);
 }
-function elevate(from2, z) {
+function add_elevation(from2, z) {
+  return move(from2, new Coord(0, 0, from2.z + z));
+}
+function set_elevation(from2, z) {
   return move(from2, new Coord(0, 0, max(z, 0)));
 }
 function sum(coord) {
@@ -3199,6 +3202,22 @@ function load_image(src) {
   return image;
 }
 
+// build/dev/javascript/gleam_community_maths/maths.mjs
+function sin(float3) {
+  return Math.sin(float3);
+}
+function pi() {
+  return Math.PI;
+}
+
+// build/dev/javascript/gleam_community_maths/gleam_community/maths/elementary.mjs
+function sin2(x3) {
+  return sin(x3);
+}
+function pi2() {
+  return pi();
+}
+
 // build/dev/javascript/client/lib/vector.mjs
 var Vector = class extends CustomType {
   constructor(x3, y3) {
@@ -3215,6 +3234,9 @@ function x(vec) {
 }
 function y(vec) {
   return vec.y;
+}
+function move2(from2, by) {
+  return at2(add2(from2.x, by.x), add2(from2.y, by.y));
 }
 var half_width = 16;
 var half_height = 8;
@@ -3303,6 +3325,8 @@ function render(context, sheet, sprite_region, at3, scale2) {
 // build/dev/javascript/client/lib/asset/cursor.mjs
 var Base = class extends CustomType {
 };
+var Pointer = class extends CustomType {
+};
 function get_sprite_key(variant) {
   if (variant instanceof Base) {
     return "Base";
@@ -3381,7 +3405,49 @@ function render_base(context, cursor, coords, camera, scale2) {
     }
   }
 }
-var cursor_animation = /* @__PURE__ */ new CursorAnimation(0, 0.75, 1);
+function render_pointer(context, cursor, coords, camera, scale2) {
+  let $ = equal(cursor.position, coords);
+  if (!$) {
+    return void 0;
+  } else {
+    let region = (() => {
+      let _pipe = get_sprite_key(new Pointer());
+      return ((_capture) => {
+        return map_get(cursor.sprite_sheet.sprites, _capture);
+      })(_pipe);
+    })();
+    if (region.isOk()) {
+      let region$1 = region[0];
+      let vec = (() => {
+        let _pipe = coords;
+        let _pipe$1 = add_elevation(_pipe, 3);
+        return from_coord(_pipe$1, camera);
+      })();
+      let y_offset = (() => {
+        let _pipe = divide(
+          cursor.animation.elapsed,
+          cursor.animation.cycle
+        );
+        let _pipe$1 = unwrap(_pipe, 0);
+        let _pipe$2 = multiply(_pipe$1, 2);
+        let _pipe$3 = multiply(_pipe$2, pi2());
+        let _pipe$4 = sin2(_pipe$3);
+        return multiply(_pipe$4, cursor.animation.amplitude);
+      })();
+      render(
+        context,
+        cursor.sprite_sheet,
+        region$1,
+        move2(vec, at2(0, y_offset)),
+        scale2
+      );
+      return void 0;
+    } else {
+      return void 0;
+    }
+  }
+}
+var cursor_animation = /* @__PURE__ */ new CursorAnimation(0, 0.9, 1);
 function new$4(position) {
   return new Cursor(position, sprite_sheet(), cursor_animation);
 }
@@ -3516,7 +3582,7 @@ function each_tile(map4, f) {
     (tile_pair) => {
       let coords = first(tile_pair);
       let t = second(tile_pair);
-      return f(elevate(coords, t.elevation), t);
+      return f(set_elevation(coords, t.elevation), t);
     }
   );
 }
@@ -3584,7 +3650,7 @@ function apply_events(game_state) {
           let _pipe2 = direction;
           let _pipe$1 = from_direction(_pipe2);
           let _pipe$2 = move(_pipe$1, acc.cursor.position);
-          return elevate(_pipe$2, 0);
+          return set_elevation(_pipe$2, 0);
         })();
         let $ = map_get(game_state.map.tiles, position);
         if ($.isOk()) {
@@ -3593,7 +3659,7 @@ function apply_events(game_state) {
           if ($1 instanceof Passable) {
             return game_state.withFields({
               cursor: game_state.cursor.withFields({
-                position: elevate(position, t.elevation)
+                position: set_elevation(position, t.elevation)
               })
             });
           } else {
@@ -3877,7 +3943,14 @@ function render3(game_state) {
                   game_state.camera,
                   game_state.scale
                 );
-                return render_base(
+                render_base(
+                  context,
+                  game_state.cursor,
+                  coords,
+                  game_state.camera,
+                  game_state.scale
+                );
+                return render_pointer(
                   context,
                   game_state.cursor,
                   coords,
@@ -3892,7 +3965,7 @@ function render3(game_state) {
         throw makeError(
           "panic",
           "client",
-          247,
+          255,
           "",
           "`panic` expression evaluated.",
           {}

@@ -241,6 +241,14 @@ fn render(game_state: engine.GameState) -> Effect(Msg) {
               game_state.camera,
               game_state.scale,
             )
+
+            cursor.render_pointer(
+              context,
+              game_state.cursor,
+              coords,
+              game_state.camera,
+              game_state.scale,
+            )
           })
         })
       }

@@ -92,7 +92,7 @@ fn apply_events(game_state: GameState) -> GameState {
           direction
           |> coord.from_direction()
           |> coord.move(acc.cursor.position)
-          |> coord.elevate(0)
+          |> coord.set_elevation(0)
 
         case dict.get(game_state.map.tiles, position) {
           Ok(t) -> {
@@ -102,7 +102,7 @@ fn apply_events(game_state: GameState) -> GameState {
                   ..game_state,
                   cursor: cursor.Cursor(
                     ..game_state.cursor,
-                    position: coord.elevate(position, t.elevation),
+                    position: coord.set_elevation(position, t.elevation),
                   ),
                 )
               }

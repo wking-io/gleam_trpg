@@ -19,6 +19,6 @@ pub fn each_tile(map: Map, f: fn(coord.Coord, tile.Tile) -> Nil) -> Nil {
   |> list.each(fn(tile_pair) {
     let coords = pair.first(tile_pair)
     let t = pair.second(tile_pair)
-    f(coord.elevate(coords, t.elevation), t)
+    f(coord.set_elevation(coords, t.elevation), t)
   })
 }

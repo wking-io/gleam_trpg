@@ -21,7 +21,11 @@ pub fn move(from: Coord, by: Coord) -> Coord {
   Coord(int.max(from.x + by.x, 0), int.max(from.y + by.y, 0), by.z)
 }
 
-pub fn elevate(from: Coord, z: Int) -> Coord {
+pub fn add_elevation(from: Coord, z: Int) -> Coord {
+  move(from, Coord(0, 0, from.z + z))
+}
+
+pub fn set_elevation(from: Coord, z: Int) -> Coord {
   move(from, Coord(0, 0, int.max(z, 0)))
 }
 
