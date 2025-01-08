@@ -28,8 +28,8 @@ pub type GameState {
 pub fn new(init: Float, map: map.Map) -> GameState {
   GameState(
     accumulator: 0.0,
-    camera: camera.new(coord.at(4, 3, 2)),
-    cursor: cursor.new(coord.at(4, 3, 2)),
+    camera: camera.new(coord.at(3, 2, 3)),
+    cursor: cursor.new(coord.at(3, 2, 3)),
     event_queue: event.new_queue(),
     fps: 0.0,
     map: map,
