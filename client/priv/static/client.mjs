@@ -307,6 +307,14 @@ function to_result(option, e) {
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/int.mjs
+function absolute_value(x3) {
+  let $ = x3 >= 0;
+  if ($) {
+    return x3;
+  } else {
+    return x3 * -1;
+  }
+}
 function compare(a, b) {
   let $ = a === b;
   if ($) {
@@ -3159,10 +3167,23 @@ function get_viewport(camera, scale2) {
     )
   ];
 }
+function set_focus(camera, focus) {
+  return camera.withFields({ focus });
+}
 var width2 = 320;
 var height2 = 180;
 function new$3(focus) {
   return new Camera(focus, width2, height2);
+}
+var bound_x = 3;
+var bound_y = 2;
+function in_bounds(camera, target) {
+  let dx = target.x - camera.focus.x;
+  let dy = target.y - camera.focus.y;
+  let dz = target.z - camera.focus.z;
+  let screen_x = absolute_value(dx - dy);
+  let screen_y = absolute_value(dx + dy + dz);
+  return screen_x < bound_x && screen_y < bound_y;
 }
 
 // build/dev/javascript/client/client_lib_canvas_ffi.mjs
@@ -3646,21 +3667,35 @@ function apply_events(game_state) {
     (acc, event2) => {
       {
         let direction = event2[0];
-        let position = (() => {
+        let flat_position = (() => {
           let _pipe2 = direction;
           let _pipe$1 = from_direction(_pipe2);
           let _pipe$2 = move(_pipe$1, acc.cursor.position);
           return set_elevation(_pipe$2, 0);
         })();
-        let $ = map_get(game_state.map.tiles, position);
+        let $ = map_get(game_state.map.tiles, flat_position);
         if ($.isOk()) {
           let t = $[0];
           let $1 = t.passability;
           if ($1 instanceof Passable) {
+            let position = set_elevation(flat_position, t.elevation);
+            let camera = (() => {
+              let $2 = in_bounds(game_state.camera, flat_position);
+              if ($2) {
+                return game_state.camera;
+              } else {
+                let _pipe2 = direction;
+                let _pipe$1 = from_direction(_pipe2);
+                let _pipe$2 = move(_pipe$1, game_state.camera.focus);
+                let _pipe$3 = set_elevation(_pipe$2, t.elevation);
+                return ((_capture) => {
+                  return set_focus(game_state.camera, _capture);
+                })(_pipe$3);
+              }
+            })();
             return game_state.withFields({
-              cursor: game_state.cursor.withFields({
-                position: set_elevation(position, t.elevation)
-              })
+              camera,
+              cursor: game_state.cursor.withFields({ position })
             });
           } else {
             return game_state;

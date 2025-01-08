@@ -88,22 +88,34 @@ fn apply_events(game_state: GameState) -> GameState {
   list.fold_right(game_state.event_queue, game_state, fn(acc, event) {
     case event {
       event.MoveCursor(direction) -> {
-        let position =
+        let flat_position =
           direction
           |> coord.from_direction()
           |> coord.move(acc.cursor.position)
           |> coord.set_elevation(0)
 
-        case dict.get(game_state.map.tiles, position) {
+        case dict.get(game_state.map.tiles, flat_position) {
           Ok(t) -> {
             case t.passability {
               tile.Passable -> {
+                let position = coord.set_elevation(flat_position, t.elevation)
+                let camera = case
+                  camera.in_bounds(game_state.camera, flat_position)
+                {
+                  True -> game_state.camera
+                  False -> {
+                    direction
+                    |> coord.from_direction()
+                    |> coord.move(game_state.camera.focus)
+                    |> coord.set_elevation(t.elevation)
+                    |> camera.set_focus(game_state.camera, _)
+                  }
+                }
+
                 GameState(
                   ..game_state,
-                  cursor: cursor.Cursor(
-                    ..game_state.cursor,
-                    position: coord.set_elevation(position, t.elevation),
-                  ),
+                  camera:,
+                  cursor: cursor.Cursor(..game_state.cursor, position:),
                 )
               }
               _ -> game_state

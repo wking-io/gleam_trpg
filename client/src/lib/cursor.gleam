@@ -1,6 +1,5 @@
 import gleam/dict
 import gleam/float
-import gleam/io
 import gleam/result
 import gleam_community/maths/elementary
 import lib/asset/cursor as asset
