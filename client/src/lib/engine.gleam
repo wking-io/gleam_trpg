@@ -6,6 +6,7 @@ import lib/camera
 import lib/constants
 import lib/coord
 import lib/cursor
+import lib/entity
 import lib/event
 import lib/map
 import lib/math
@@ -22,10 +23,22 @@ pub type GameState {
     previous_time: Float,
     scale: math.Scale,
     debug: Bool,
+    entity_map: dict.Dict(entity.EntityReference, entity.Entity),
+    location_map: dict.Dict(coord.Coord, List(entity.EntityReference)),
   )
 }
 
 pub fn new(init: Float, map: map.Map) -> GameState {
+  let cursor = cursor.new(coord.at(3, 2, 3))
+
+  let entity_map =
+    dict.new()
+    |> dict.insert("cursor", entity.CursorEntity(cursor))
+
+  let location_map =
+    dict.new()
+    |> dict.insert(coord.at(3, 2, 3), ["cursor"])
+
   GameState(
     accumulator: 0.0,
     camera: camera.new(coord.at(3, 2, 3)),
@@ -36,6 +49,8 @@ pub fn new(init: Float, map: map.Map) -> GameState {
     previous_time: init,
     scale: math.Double,
     debug: False,
+    entity_map:,
+    location_map:,
   )
 }
 

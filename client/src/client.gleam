@@ -1,5 +1,6 @@
 // IMPORTS ---------------------------------------------------------------------
 
+import gleam/dict
 import gleam/float
 import gleam/int
 import gleam/pair
@@ -225,6 +226,8 @@ fn render(game_state: engine.GameState) -> Effect(Msg) {
 
           game_state.map
           |> map.each_tile(fn(coords, tile) {
+            let entityRefs = dict.get(game_state.location_map, coords)
+
             tile.render(
               context,
               tile,
@@ -233,6 +236,10 @@ fn render(game_state: engine.GameState) -> Effect(Msg) {
               game_state.camera,
               game_state.scale,
             )
+
+            list.each(entityRefs, fn(ref) {
+              entity.render(ref, context, coords, game_state)
+            })
 
             cursor.render_base(
               context,

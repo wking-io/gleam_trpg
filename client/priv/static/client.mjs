@@ -3473,6 +3473,14 @@ function new$4(position) {
   return new Cursor(position, sprite_sheet(), cursor_animation);
 }
 
+// build/dev/javascript/client/lib/entity.mjs
+var CursorEntity = class extends CustomType {
+  constructor(cursor) {
+    super();
+    this.cursor = cursor;
+  }
+};
+
 // build/dev/javascript/client/lib/event.mjs
 var MoveCursor = class extends CustomType {
   constructor(x0) {
@@ -3610,7 +3618,7 @@ function each_tile(map4, f) {
 
 // build/dev/javascript/client/lib/engine.mjs
 var GameState = class extends CustomType {
-  constructor(accumulator, camera, cursor, event_queue, fps, map4, previous_time, scale2, debug2) {
+  constructor(accumulator, camera, cursor, event_queue, fps, map4, previous_time, scale2, debug2, entity_map, location_map) {
     super();
     this.accumulator = accumulator;
     this.camera = camera;
@@ -3621,9 +3629,20 @@ var GameState = class extends CustomType {
     this.previous_time = previous_time;
     this.scale = scale2;
     this.debug = debug2;
+    this.entity_map = entity_map;
+    this.location_map = location_map;
   }
 };
 function new$5(init3, map4) {
+  let cursor = new$4(at(3, 2, 3));
+  let entity_map = (() => {
+    let _pipe = new_map();
+    return insert(_pipe, "cursor", new CursorEntity(cursor));
+  })();
+  let location_map = (() => {
+    let _pipe = new_map();
+    return insert(_pipe, at(3, 2, 3), toList(["cursor"]));
+  })();
   return new GameState(
     0,
     new$3(at(3, 2, 3)),
@@ -3633,7 +3652,9 @@ function new$5(init3, map4) {
     map4,
     init3,
     new Double(),
-    false
+    false,
+    entity_map,
+    location_map
   );
 }
 function calc_frame_time(game_state, current_time) {
