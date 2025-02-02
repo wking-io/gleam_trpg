@@ -20,6 +20,7 @@ import lib/math
 import lib/render
 import lib/state
 import lib/tile
+import lib/turn
 import lustre
 import lustre/attribute
 import lustre/effect.{type Effect}
@@ -58,6 +59,7 @@ type Msg {
   PlayerQueueEvent(event.Event)
   BrowserPauseGame
   BrowserUnpauseGame
+  TurnEvent(turn.Event)
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -118,6 +120,15 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     BrowserUnpauseGame -> {
       case model {
         Paused(game_state) -> #(Ready(game_state), effect.none())
+        _ -> #(model, effect.none())
+      }
+    }
+    TurnEvent(event) -> {
+      case model {
+        Ready(game_state) -> #(
+          Ready(turn.update(event, game_state)),
+          effect.none(),
+        )
         _ -> #(model, effect.none())
       }
     }

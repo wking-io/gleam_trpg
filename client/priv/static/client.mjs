@@ -2885,13 +2885,13 @@ var LustreClientApplication = class _LustreClientApplication {
    *
    * @returns {Gleam.Ok<(action: Lustre.Action<Lustre.Client, Msg>>) => void>}
    */
-  static start({ init: init3, update: update4, view: view2 }, selector, flags) {
+  static start({ init: init3, update: update5, view: view2 }, selector, flags) {
     if (!is_browser())
       return new Error(new NotABrowser());
     const root = selector instanceof HTMLElement ? selector : document.querySelector(selector);
     if (!root)
       return new Error(new ElementNotFound(selector));
-    const app = new _LustreClientApplication(root, init3(flags), update4, view2);
+    const app = new _LustreClientApplication(root, init3(flags), update5, view2);
     return new Ok((action) => app.send(action));
   }
   /**
@@ -2902,10 +2902,10 @@ var LustreClientApplication = class _LustreClientApplication {
    *
    * @returns {LustreClientApplication}
    */
-  constructor(root, [init3, effects], update4, view2) {
+  constructor(root, [init3, effects], update5, view2) {
     this.root = root;
     this.#model = init3;
-    this.#update = update4;
+    this.#update = update5;
     this.#view = view2;
     this.#tickScheduled = window.requestAnimationFrame(
       () => this.#tick(effects.all.toArray(), true)
@@ -3020,18 +3020,18 @@ var LustreClientApplication = class _LustreClientApplication {
 };
 var start = LustreClientApplication.start;
 var LustreServerApplication = class _LustreServerApplication {
-  static start({ init: init3, update: update4, view: view2, on_attribute_change }, flags) {
+  static start({ init: init3, update: update5, view: view2, on_attribute_change }, flags) {
     const app = new _LustreServerApplication(
       init3(flags),
-      update4,
+      update5,
       view2,
       on_attribute_change
     );
     return new Ok((action) => app.send(action));
   }
-  constructor([model, effects], update4, view2, on_attribute_change) {
+  constructor([model, effects], update5, view2, on_attribute_change) {
     this.#model = model;
-    this.#update = update4;
+    this.#update = update5;
     this.#view = view2;
     this.#html = view2(model);
     this.#onAttributeChange = on_attribute_change;
@@ -3134,10 +3134,10 @@ var is_browser = () => globalThis.window && window.document;
 
 // build/dev/javascript/lustre/lustre.mjs
 var App = class extends CustomType {
-  constructor(init3, update4, view2, on_attribute_change) {
+  constructor(init3, update5, view2, on_attribute_change) {
     super();
     this.init = init3;
-    this.update = update4;
+    this.update = update5;
     this.view = view2;
     this.on_attribute_change = on_attribute_change;
   }
@@ -3150,8 +3150,8 @@ var ElementNotFound = class extends CustomType {
 };
 var NotABrowser = class extends CustomType {
 };
-function application(init3, update4, view2) {
-  return new App(init3, update4, view2, new None());
+function application(init3, update5, view2) {
+  return new App(init3, update5, view2, new None());
 }
 function start2(app, selector, flags) {
   return guard(
@@ -4722,6 +4722,11 @@ function with_context() {
   }
 }
 
+// build/dev/javascript/client/lib/turn.mjs
+function update3(event2, game_state) {
+  return game_state;
+}
+
 // build/dev/javascript/client/client.mjs
 var Idle2 = class extends CustomType {
 };
@@ -4922,7 +4927,7 @@ function render4(game_state) {
         throw makeError(
           "panic",
           "client",
-          328,
+          339,
           "",
           "`panic` expression evaluated.",
           {}
@@ -4934,7 +4939,7 @@ function render4(game_state) {
 function update_and_schedule(game_state) {
   return batch(toList([render4(game_state), schedule_next_frame()]));
 }
-function update3(model, msg) {
+function update4(model, msg) {
   if (msg instanceof AppSetNoCanvas) {
     return [new NoCanvas(), none()];
   } else if (msg instanceof Tick) {
@@ -4962,7 +4967,7 @@ function update3(model, msg) {
       throw makeError(
         "panic",
         "client",
-        86,
+        88,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -4998,7 +5003,7 @@ function update3(model, msg) {
       throw makeError(
         "panic",
         "client",
-        100,
+        102,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -5018,10 +5023,18 @@ function update3(model, msg) {
     } else {
       return [model, none()];
     }
-  } else {
+  } else if (msg instanceof BrowserUnpauseGame) {
     if (model instanceof Paused) {
       let game_state = model.game_state;
       return [new Ready(game_state), none()];
+    } else {
+      return [model, none()];
+    }
+  } else {
+    let event2 = msg[0];
+    if (model instanceof Ready) {
+      let game_state = model.game_state;
+      return [new Ready(update3(event2, game_state)), none()];
     } else {
       return [model, none()];
     }
@@ -5154,13 +5167,13 @@ function view(model) {
   );
 }
 function main() {
-  let app = application(init2, update3, view);
+  let app = application(init2, update4, view);
   let $ = start2(app, "#app", void 0);
   if (!$.isOk()) {
     throw makeError(
       "let_assert",
       "client",
-      34,
+      35,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }
