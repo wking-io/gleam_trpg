@@ -3,9 +3,12 @@
 import gleam/dict
 import gleam/float
 import gleam/int
+import gleam/list
 import gleam/pair
+import gleam/result
 import lib/camera
 import lib/canvas/context as context_impl
+import lib/classnames
 import lib/cursor
 import lib/direction
 import lib/engine
@@ -15,6 +18,7 @@ import lib/map
 import lib/map/demo_one
 import lib/math
 import lib/render
+import lib/state
 import lib/tile
 import lustre
 import lustre/attribute
@@ -37,7 +41,8 @@ pub fn main() {
 type Model {
   Idle
   NoCanvas
-  Ready(game_state: engine.GameState)
+  Ready(game_state: state.GameState)
+  Paused(game_state: state.GameState)
 }
 
 fn init(_) -> #(Model, Effect(Msg)) {
@@ -51,6 +56,8 @@ type Msg {
   ToggleDebug
   Tick(Float)
   PlayerQueueEvent(event.Event)
+  BrowserPauseGame
+  BrowserUnpauseGame
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -61,7 +68,16 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
         Ready(game_state) -> {
           game_state
           |> engine.update(current_time)
-          |> update_and_schedule
+          |> fn(game_state) {
+            #(Ready(game_state), update_and_schedule(game_state))
+          }
+        }
+        Paused(game_state) -> {
+          game_state
+          |> engine.paused_update(current_time)
+          |> fn(game_state) {
+            #(Paused(game_state), update_and_schedule(game_state))
+          }
         }
         Idle -> #(
           Ready(engine.new(current_time, demo_one.new())),
@@ -74,10 +90,10 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       case model {
         Ready(game_state) -> #(
           Ready(
-            engine.GameState(
-              ..game_state,
-              event_queue: [event, ..game_state.event_queue],
-            ),
+            state.GameState(..game_state, event_queue: [
+              event,
+              ..game_state.event_queue
+            ]),
           ),
           effect.none(),
         )
@@ -93,6 +109,18 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
         _ -> #(model, effect.none())
       }
     }
+    BrowserPauseGame -> {
+      case model {
+        Ready(game_state) -> #(Paused(game_state), effect.none())
+        _ -> #(model, effect.none())
+      }
+    }
+    BrowserUnpauseGame -> {
+      case model {
+        Paused(game_state) -> #(Ready(game_state), effect.none())
+        _ -> #(model, effect.none())
+      }
+    }
   }
 }
 
@@ -102,14 +130,17 @@ fn setup_listeners() {
       let direction = direction.from_game_key(game_key)
       dispatch(PlayerQueueEvent(event.MoveCursor(direction)))
     })
+    engine.on_game_focus(fn(focused) {
+      dispatch(case focused {
+        True -> BrowserUnpauseGame
+        False -> BrowserPauseGame
+      })
+    })
   })
 }
 
-fn update_and_schedule(game_state: engine.GameState) -> #(Model, Effect(Msg)) {
-  #(
-    Ready(game_state),
-    effect.batch([render(game_state), schedule_next_frame()]),
-  )
+fn update_and_schedule(game_state: state.GameState) -> Effect(Msg) {
+  effect.batch([render(game_state), schedule_next_frame()])
 }
 
 fn schedule_next_frame() {
@@ -127,6 +158,13 @@ fn view(model: Model) -> Element(Msg) {
   let half_width_px = { canvas_width / 2 } |> int.to_string <> "px"
   let half_height_px = { canvas_height / 2 } |> int.to_string <> "px"
   let #(is_debug, debug_display) = get_show_debug(model)
+  let fps = get_fps(model)
+  let state = case model {
+    Idle -> "Idle"
+    Ready(_) -> "Ready"
+    Paused(_) -> "Paused"
+    NoCanvas -> "NoCanvas"
+  }
 
   html.div(
     [
@@ -181,6 +219,25 @@ fn view(model: Model) -> Element(Msg) {
             html.text("Debug"),
           ],
         ),
+        html.p(
+          [
+            attribute.class(
+              classnames.from([
+                classnames.Static("font-mono text-sm"),
+                classnames.Conditional(!is_debug, "hidden"),
+              ]),
+            ),
+          ],
+          [html.text(float.to_string(fps))],
+        ),
+        html.p(
+          [
+            attribute.class(
+              classnames.from([classnames.Static("font-mono text-sm")]),
+            ),
+          ],
+          [html.text(state)],
+        ),
       ]),
     ],
   )
@@ -209,7 +266,14 @@ fn get_show_debug(model: Model) {
   }
 }
 
-fn render(game_state: engine.GameState) -> Effect(Msg) {
+fn get_fps(model: Model) {
+  case model {
+    Ready(game_state) -> game_state.fps
+    _ -> 0.0
+  }
+}
+
+fn render(game_state: state.GameState) -> Effect(Msg) {
   effect.from(fn(_dispatch) {
     case render.with_context() {
       Ok(render.RenderContext(_canvas, context)) -> {
@@ -226,8 +290,6 @@ fn render(game_state: engine.GameState) -> Effect(Msg) {
 
           game_state.map
           |> map.each_tile(fn(coords, tile) {
-            let entityRefs = dict.get(game_state.location_map, coords)
-
             tile.render(
               context,
               tile,
@@ -237,10 +299,6 @@ fn render(game_state: engine.GameState) -> Effect(Msg) {
               game_state.scale,
             )
 
-            list.each(entityRefs, fn(ref) {
-              entity.render(ref, context, coords, game_state)
-            })
-
             cursor.render_base(
               context,
               game_state.cursor,
@@ -248,6 +306,14 @@ fn render(game_state: engine.GameState) -> Effect(Msg) {
               game_state.camera,
               game_state.scale,
             )
+
+            let _ =
+              dict.get(game_state.location_map, coords)
+              |> result.map(
+                list.each(_, fn(ref) {
+                  render.entity(ref, context, coords, game_state)
+                }),
+              )
 
             cursor.render_pointer(
               context,

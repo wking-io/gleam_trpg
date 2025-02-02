@@ -7,11 +7,18 @@ import lib/camera
 import lib/canvas/context
 import lib/constants
 import lib/coord
+import lib/frames
 import lib/math
 import lib/sprite
 import lib/vector
 
-const cursor_animation = CursorAnimation(0.0, 0.9, 1.0)
+pub fn entity_ref() {
+  "cursor"
+}
+
+fn cursor_animation() {
+  CursorAnimation(0.0, frames.to_duration(60_000), 1.0)
+}
 
 pub type Cursor {
   Cursor(
@@ -29,7 +36,7 @@ pub fn new(position: coord.Coord) -> Cursor {
   Cursor(
     position:,
     sprite_sheet: asset.sprite_sheet(),
-    animation: cursor_animation,
+    animation: cursor_animation(),
   )
 }
 
@@ -90,7 +97,7 @@ pub fn render_pointer(
         Ok(region) -> {
           let vec =
             coords
-            |> coord.add_elevation(3)
+            |> coord.add_elevation(6)
             |> vector.from_coord(camera)
 
           let y_offset =

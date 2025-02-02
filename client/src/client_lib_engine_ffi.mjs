@@ -18,3 +18,8 @@ function with_keyboard_data(cb) {
 export function add_keyboard_event_listener(cb) {
   return window.addEventListener("keydown", with_keyboard_data(cb));
 }
+
+export function add_game_focus_event_listener(cb) {
+  window.addEventListener("focus", () => cb(true));
+  window.addEventListener("blur", () => cb(false));
+}

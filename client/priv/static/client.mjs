@@ -102,11 +102,21 @@ var BitArray = class _BitArray {
   }
   // @internal
   binaryFromSlice(start3, end) {
-    return new _BitArray(this.buffer.slice(start3, end));
+    const buffer = new Uint8Array(
+      this.buffer.buffer,
+      this.buffer.byteOffset + start3,
+      end - start3
+    );
+    return new _BitArray(buffer);
   }
   // @internal
   sliceAfter(index2) {
-    return new _BitArray(this.buffer.slice(index2));
+    const buffer = new Uint8Array(
+      this.buffer.buffer,
+      this.buffer.byteOffset + index2,
+      this.buffer.byteLength - index2
+    );
+    return new _BitArray(buffer);
   }
 };
 var UtfCodepoint = class {
@@ -114,6 +124,42 @@ var UtfCodepoint = class {
     this.value = value;
   }
 };
+function toBitArray(segments) {
+  if (segments.length === 0) {
+    return new BitArray(new Uint8Array());
+  }
+  if (segments.length === 1) {
+    if (segments[0] instanceof Uint8Array) {
+      return new BitArray(segments[0]);
+    }
+    return new BitArray(new Uint8Array(segments));
+  }
+  let bytes = 0;
+  let hasUint8ArraySegment = false;
+  for (const segment of segments) {
+    if (segment instanceof Uint8Array) {
+      bytes += segment.byteLength;
+      hasUint8ArraySegment = true;
+    } else {
+      bytes++;
+    }
+  }
+  if (!hasUint8ArraySegment) {
+    return new BitArray(new Uint8Array(segments));
+  }
+  let u8Array = new Uint8Array(bytes);
+  let cursor = 0;
+  for (let segment of segments) {
+    if (segment instanceof Uint8Array) {
+      u8Array.set(segment, cursor);
+      cursor += segment.byteLength;
+    } else {
+      u8Array[cursor] = segment;
+      cursor++;
+    }
+  }
+  return new BitArray(u8Array);
+}
 function byteArrayToInt(byteArray, start3, end, isBigEndian, isSigned) {
   const byteSize = end - start3;
   if (byteSize <= 6) {
@@ -165,6 +211,9 @@ function byteArrayToFloat(byteArray, start3, end, isBigEndian) {
     const msg = `Sized floats must be 32-bit or 64-bit on JavaScript, got size of ${byteSize * 8} bits`;
     throw new globalThis.Error(msg);
   }
+}
+function stringBits(string4) {
+  return new TextEncoder().encode(string4);
 }
 var Result = class _Result extends CustomType {
   // @internal
@@ -280,14 +329,6 @@ function makeError(variant, module, line, fn, message, extra) {
   return error;
 }
 
-// build/dev/javascript/gleam_stdlib/gleam/order.mjs
-var Lt = class extends CustomType {
-};
-var Eq = class extends CustomType {
-};
-var Gt = class extends CustomType {
-};
-
 // build/dev/javascript/gleam_stdlib/gleam/option.mjs
 var Some = class extends CustomType {
   constructor(x0) {
@@ -306,6 +347,64 @@ function to_result(option, e) {
   }
 }
 
+// build/dev/javascript/gleam_stdlib/gleam/order.mjs
+var Lt = class extends CustomType {
+};
+var Eq = class extends CustomType {
+};
+var Gt = class extends CustomType {
+};
+
+// build/dev/javascript/gleam_stdlib/gleam/float.mjs
+function compare(a, b) {
+  let $ = a === b;
+  if ($) {
+    return new Eq();
+  } else {
+    let $1 = a < b;
+    if ($1) {
+      return new Lt();
+    } else {
+      return new Gt();
+    }
+  }
+}
+function negate(x3) {
+  return -1 * x3;
+}
+function round2(x3) {
+  let $ = x3 >= 0;
+  if ($) {
+    return round(x3);
+  } else {
+    return 0 - round(negate(x3));
+  }
+}
+function modulo(dividend, divisor) {
+  if (divisor === 0) {
+    return new Error(void 0);
+  } else {
+    return new Ok(dividend - floor(divideFloat(dividend, divisor)) * divisor);
+  }
+}
+function divide(a, b) {
+  if (b === 0) {
+    return new Error(void 0);
+  } else {
+    let b$1 = b;
+    return new Ok(divideFloat(a, b$1));
+  }
+}
+function add(a, b) {
+  return a + b;
+}
+function multiply(a, b) {
+  return a * b;
+}
+function subtract(a, b) {
+  return a - b;
+}
+
 // build/dev/javascript/gleam_stdlib/gleam/int.mjs
 function absolute_value(x3) {
   let $ = x3 >= 0;
@@ -315,7 +414,7 @@ function absolute_value(x3) {
     return x3 * -1;
   }
 }
-function compare(a, b) {
+function compare2(a, b) {
   let $ = a === b;
   if ($) {
     return new Eq();
@@ -336,59 +435,10 @@ function max(a, b) {
     return b;
   }
 }
-
-// build/dev/javascript/gleam_stdlib/gleam/dict.mjs
-function insert(dict, key, value) {
-  return map_insert(key, value, dict);
-}
-function from_list_loop(loop$list, loop$initial) {
-  while (true) {
-    let list = loop$list;
-    let initial = loop$initial;
-    if (list.hasLength(0)) {
-      return initial;
-    } else {
-      let x3 = list.head;
-      let rest = list.tail;
-      loop$list = rest;
-      loop$initial = insert(initial, x3[0], x3[1]);
-    }
-  }
-}
-function from_list(list) {
-  return from_list_loop(list, new_map());
-}
-function reverse_and_concat(loop$remaining, loop$accumulator) {
-  while (true) {
-    let remaining = loop$remaining;
-    let accumulator = loop$accumulator;
-    if (remaining.hasLength(0)) {
-      return accumulator;
-    } else {
-      let item = remaining.head;
-      let rest = remaining.tail;
-      loop$remaining = rest;
-      loop$accumulator = prepend(item, accumulator);
-    }
-  }
-}
-function do_keys_loop(loop$list, loop$acc) {
-  while (true) {
-    let list = loop$list;
-    let acc = loop$acc;
-    if (list.hasLength(0)) {
-      return reverse_and_concat(acc, toList([]));
-    } else {
-      let first3 = list.head;
-      let rest = list.tail;
-      loop$list = rest;
-      loop$acc = prepend(first3[0], acc);
-    }
-  }
-}
-function keys(dict) {
-  let list_of_pairs = map_to_list(dict);
-  return do_keys_loop(list_of_pairs, toList([]));
+function random(max2) {
+  let _pipe = random_uniform() * identity(max2);
+  let _pipe$1 = floor(_pipe);
+  return round2(_pipe$1);
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/pair.mjs
@@ -423,6 +473,34 @@ function reverse_loop(loop$remaining, loop$accumulator) {
 function reverse(list) {
   return reverse_loop(list, toList([]));
 }
+function filter_map_loop(loop$list, loop$fun, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let fun = loop$fun;
+    let acc = loop$acc;
+    if (list.hasLength(0)) {
+      return reverse(acc);
+    } else {
+      let first$1 = list.head;
+      let rest$1 = list.tail;
+      let new_acc = (() => {
+        let $ = fun(first$1);
+        if ($.isOk()) {
+          let first$2 = $[0];
+          return prepend(first$2, acc);
+        } else {
+          return acc;
+        }
+      })();
+      loop$list = rest$1;
+      loop$fun = fun;
+      loop$acc = new_acc;
+    }
+  }
+}
+function filter_map(list, fun) {
+  return filter_map_loop(list, fun, toList([]));
+}
 function map_loop(loop$list, loop$fun, loop$acc) {
   while (true) {
     let list = loop$list;
@@ -444,20 +522,20 @@ function map(list, fun) {
 }
 function append_loop(loop$first, loop$second) {
   while (true) {
-    let first3 = loop$first;
+    let first4 = loop$first;
     let second2 = loop$second;
-    if (first3.hasLength(0)) {
+    if (first4.hasLength(0)) {
       return second2;
     } else {
-      let item = first3.head;
-      let rest$1 = first3.tail;
+      let item = first4.head;
+      let rest$1 = first4.tail;
       loop$first = rest$1;
       loop$second = prepend(item, second2);
     }
   }
 }
-function append(first3, second2) {
-  return append_loop(reverse(first3), second2);
+function append(first4, second2) {
+  return append_loop(reverse(first4), second2);
 }
 function fold(loop$list, loop$initial, loop$fun) {
   while (true) {
@@ -556,10 +634,10 @@ function sequences(loop$list, loop$compare, loop$growing, loop$direction, loop$p
         if (rest$1.hasLength(0)) {
           return prepend(toList([new$1]), acc$1);
         } else {
-          let next = rest$1.head;
+          let next2 = rest$1.head;
           let rest$2 = rest$1.tail;
           let direction$1 = (() => {
-            let $1 = compare4(new$1, next);
+            let $1 = compare4(new$1, next2);
             if ($1 instanceof Lt) {
               return new Ascending();
             } else if ($1 instanceof Eq) {
@@ -572,7 +650,7 @@ function sequences(loop$list, loop$compare, loop$growing, loop$direction, loop$p
           loop$compare = compare4;
           loop$growing = toList([new$1]);
           loop$direction = direction$1;
-          loop$prev = next;
+          loop$prev = next2;
           loop$acc = acc$1;
         }
       } else if ($ instanceof Lt && direction instanceof Descending) {
@@ -586,10 +664,10 @@ function sequences(loop$list, loop$compare, loop$growing, loop$direction, loop$p
         if (rest$1.hasLength(0)) {
           return prepend(toList([new$1]), acc$1);
         } else {
-          let next = rest$1.head;
+          let next2 = rest$1.head;
           let rest$2 = rest$1.tail;
           let direction$1 = (() => {
-            let $1 = compare4(new$1, next);
+            let $1 = compare4(new$1, next2);
             if ($1 instanceof Lt) {
               return new Ascending();
             } else if ($1 instanceof Eq) {
@@ -602,7 +680,7 @@ function sequences(loop$list, loop$compare, loop$growing, loop$direction, loop$p
           loop$compare = compare4;
           loop$growing = toList([new$1]);
           loop$direction = direction$1;
-          loop$prev = next;
+          loop$prev = next2;
           loop$acc = acc$1;
         }
       } else {
@@ -616,10 +694,10 @@ function sequences(loop$list, loop$compare, loop$growing, loop$direction, loop$p
         if (rest$1.hasLength(0)) {
           return prepend(toList([new$1]), acc$1);
         } else {
-          let next = rest$1.head;
+          let next2 = rest$1.head;
           let rest$2 = rest$1.tail;
           let direction$1 = (() => {
-            let $1 = compare4(new$1, next);
+            let $1 = compare4(new$1, next2);
             if ($1 instanceof Lt) {
               return new Ascending();
             } else if ($1 instanceof Eq) {
@@ -632,7 +710,7 @@ function sequences(loop$list, loop$compare, loop$growing, loop$direction, loop$p
           loop$compare = compare4;
           loop$growing = toList([new$1]);
           loop$direction = direction$1;
-          loop$prev = next;
+          loop$prev = next2;
           loop$acc = acc$1;
         }
       }
@@ -847,21 +925,37 @@ function each(loop$list, loop$f) {
 // build/dev/javascript/gleam_stdlib/gleam/string.mjs
 function drop_start(loop$string, loop$num_graphemes) {
   while (true) {
-    let string3 = loop$string;
+    let string4 = loop$string;
     let num_graphemes = loop$num_graphemes;
     let $ = num_graphemes > 0;
     if (!$) {
-      return string3;
+      return string4;
     } else {
-      let $1 = pop_grapheme(string3);
+      let $1 = pop_grapheme(string4);
       if ($1.isOk()) {
         let string$1 = $1[0][1];
         loop$string = string$1;
         loop$num_graphemes = num_graphemes - 1;
       } else {
-        return string3;
+        return string4;
       }
     }
+  }
+}
+function utf_codepoint(value) {
+  if (value > 1114111) {
+    let i = value;
+    return new Error(void 0);
+  } else if (value === 65534) {
+    return new Error(void 0);
+  } else if (value === 65535) {
+    return new Error(void 0);
+  } else if (value >= 55296 && value <= 57343) {
+    let i = value;
+    return new Error(void 0);
+  } else {
+    let i = value;
+    return new Ok(codepoint(i));
   }
 }
 function inspect2(term) {
@@ -958,7 +1052,12 @@ function push_path(error, name) {
       return identity(_pipe$1);
     }
   })();
-  return error.withFields({ path: prepend(name$2, error.path) });
+  let _record = error;
+  return new DecodeError(
+    _record.expected,
+    _record.found,
+    prepend(name$2, error.path)
+  );
 }
 function map_errors(result, f) {
   return map_error(
@@ -1707,38 +1806,48 @@ function to_string(term) {
   return term.toString();
 }
 function float_to_string(float3) {
-  const string3 = float3.toString().replace("+", "");
-  if (string3.indexOf(".") >= 0) {
-    return string3;
+  const string4 = float3.toString().replace("+", "");
+  if (string4.indexOf(".") >= 0) {
+    return string4;
   } else {
-    const index2 = string3.indexOf("e");
+    const index2 = string4.indexOf("e");
     if (index2 >= 0) {
-      return string3.slice(0, index2) + ".0" + string3.slice(index2);
+      return string4.slice(0, index2) + ".0" + string4.slice(index2);
     } else {
-      return string3 + ".0";
+      return string4 + ".0";
     }
   }
 }
 var segmenter = void 0;
-function graphemes_iterator(string3) {
+function graphemes_iterator(string4) {
   if (globalThis.Intl && Intl.Segmenter) {
     segmenter ||= new Intl.Segmenter();
-    return segmenter.segment(string3)[Symbol.iterator]();
+    return segmenter.segment(string4)[Symbol.iterator]();
   }
 }
-function pop_grapheme(string3) {
-  let first3;
-  const iterator = graphemes_iterator(string3);
+function pop_grapheme(string4) {
+  let first4;
+  const iterator = graphemes_iterator(string4);
   if (iterator) {
-    first3 = iterator.next().value?.segment;
+    first4 = iterator.next().value?.segment;
   } else {
-    first3 = string3.match(/./su)?.[0];
+    first4 = string4.match(/./su)?.[0];
   }
-  if (first3) {
-    return new Ok([first3, string3.slice(first3.length)]);
+  if (first4) {
+    return new Ok([first4, string4.slice(first4.length)]);
   } else {
     return new Error(Nil);
   }
+}
+function join(xs, separator) {
+  const iterator = xs[Symbol.iterator]();
+  let result = iterator.next().value || "";
+  let current = iterator.next();
+  while (!current.done) {
+    result = result + separator + current.value;
+    current = iterator.next();
+  }
+  return result;
 }
 function concat(xs) {
   let result = "";
@@ -1769,36 +1878,144 @@ var unicode_whitespaces = [
 ].join("");
 var trim_start_regex = new RegExp(`^[${unicode_whitespaces}]*`);
 var trim_end_regex = new RegExp(`[${unicode_whitespaces}]*$`);
-function print_debug(string3) {
+function bit_array_from_string(string4) {
+  return toBitArray([stringBits(string4)]);
+}
+function print_debug(string4) {
   if (typeof process === "object" && process.stderr?.write) {
-    process.stderr.write(string3 + "\n");
+    process.stderr.write(string4 + "\n");
   } else if (typeof Deno === "object") {
-    Deno.stderr.writeSync(new TextEncoder().encode(string3 + "\n"));
+    Deno.stderr.writeSync(new TextEncoder().encode(string4 + "\n"));
   } else {
-    console.log(string3);
+    console.log(string4);
   }
 }
 function floor(float3) {
   return Math.floor(float3);
 }
-function round2(float3) {
+function round(float3) {
   return Math.round(float3);
+}
+function random_uniform() {
+  const random_uniform_result = Math.random();
+  if (random_uniform_result === 1) {
+    return random_uniform();
+  }
+  return random_uniform_result;
+}
+function codepoint(int4) {
+  return new UtfCodepoint(int4);
+}
+function utf_codepoint_list_to_string(utf_codepoint_integer_list) {
+  return utf_codepoint_integer_list.toArray().map((x3) => String.fromCodePoint(x3.value)).join("");
 }
 function new_map() {
   return Dict.new();
 }
-function map_to_list(map4) {
-  return List.fromArray(map4.entries());
+function map_to_list(map5) {
+  return List.fromArray(map5.entries());
 }
-function map_get(map4, key) {
-  const value = map4.get(key, NOT_FOUND);
+function map_get(map5, key) {
+  const value = map5.get(key, NOT_FOUND);
   if (value === NOT_FOUND) {
     return new Error(Nil);
   }
   return new Ok(value);
 }
-function map_insert(key, value, map4) {
-  return map4.set(key, value);
+function map_insert(key, value, map5) {
+  return map5.set(key, value);
+}
+var b64EncodeLookup = [
+  65,
+  66,
+  67,
+  68,
+  69,
+  70,
+  71,
+  72,
+  73,
+  74,
+  75,
+  76,
+  77,
+  78,
+  79,
+  80,
+  81,
+  82,
+  83,
+  84,
+  85,
+  86,
+  87,
+  88,
+  89,
+  90,
+  97,
+  98,
+  99,
+  100,
+  101,
+  102,
+  103,
+  104,
+  105,
+  106,
+  107,
+  108,
+  109,
+  110,
+  111,
+  112,
+  113,
+  114,
+  115,
+  116,
+  117,
+  118,
+  119,
+  120,
+  121,
+  122,
+  48,
+  49,
+  50,
+  51,
+  52,
+  53,
+  54,
+  55,
+  56,
+  57,
+  43,
+  47
+];
+var b64TextDecoder;
+function encode64(bit_array2, padding) {
+  b64TextDecoder ??= new TextDecoder();
+  const bytes = bit_array2.buffer;
+  const m = bytes.length;
+  const k = m % 3;
+  const n = Math.floor(m / 3) * 4 + (k && k + 1);
+  const N = Math.ceil(m / 3) * 4;
+  const encoded = new Uint8Array(N);
+  for (let i = 0, j = 0; j < m; i += 4, j += 3) {
+    const y3 = (bytes[j] << 16) + (bytes[j + 1] << 8) + (bytes[j + 2] | 0);
+    encoded[i] = b64EncodeLookup[y3 >> 18];
+    encoded[i + 1] = b64EncodeLookup[y3 >> 12 & 63];
+    encoded[i + 2] = b64EncodeLookup[y3 >> 6 & 63];
+    encoded[i + 3] = b64EncodeLookup[y3 & 63];
+  }
+  let base64 = b64TextDecoder.decode(new Uint8Array(encoded.buffer, 0, n));
+  if (padding) {
+    if (k === 1) {
+      base64 += "==";
+    } else if (k === 2) {
+      base64 += "=";
+    }
+  }
+  return base64;
 }
 function classify_dynamic(data) {
   if (typeof data === "string") {
@@ -1941,14 +2158,14 @@ function inspectString(str) {
   new_str += '"';
   return new_str;
 }
-function inspectDict(map4) {
+function inspectDict(map5) {
   let body = "dict.from_list([";
-  let first3 = true;
-  map4.forEach((value, key) => {
-    if (!first3)
+  let first4 = true;
+  map5.forEach((value, key) => {
+    if (!first4)
       body = body + ", ";
     body = body + "#(" + inspect(key) + ", " + inspect(value) + ")";
-    first3 = false;
+    first4 = false;
   });
   return body + "])";
 }
@@ -1979,54 +2196,58 @@ function inspectUtfCodepoint(codepoint2) {
   return `//utfcodepoint(${String.fromCodePoint(codepoint2.value)})`;
 }
 
-// build/dev/javascript/gleam_stdlib/gleam/float.mjs
-function compare2(a, b) {
-  let $ = a === b;
-  if ($) {
-    return new Eq();
-  } else {
-    let $1 = a < b;
-    if ($1) {
-      return new Lt();
+// build/dev/javascript/gleam_stdlib/gleam/dict.mjs
+function insert(dict, key, value) {
+  return map_insert(key, value, dict);
+}
+function from_list_loop(loop$list, loop$initial) {
+  while (true) {
+    let list = loop$list;
+    let initial = loop$initial;
+    if (list.hasLength(0)) {
+      return initial;
     } else {
-      return new Gt();
+      let x3 = list.head;
+      let rest = list.tail;
+      loop$list = rest;
+      loop$initial = insert(initial, x3[0], x3[1]);
     }
   }
 }
-function negate(x3) {
-  return -1 * x3;
+function from_list(list) {
+  return from_list_loop(list, new_map());
 }
-function round(x3) {
-  let $ = x3 >= 0;
-  if ($) {
-    return round2(x3);
-  } else {
-    return 0 - round2(negate(x3));
+function reverse_and_concat(loop$remaining, loop$accumulator) {
+  while (true) {
+    let remaining = loop$remaining;
+    let accumulator = loop$accumulator;
+    if (remaining.hasLength(0)) {
+      return accumulator;
+    } else {
+      let item = remaining.head;
+      let rest = remaining.tail;
+      loop$remaining = rest;
+      loop$accumulator = prepend(item, accumulator);
+    }
   }
 }
-function modulo(dividend, divisor) {
-  if (divisor === 0) {
-    return new Error(void 0);
-  } else {
-    return new Ok(dividend - floor(divideFloat(dividend, divisor)) * divisor);
+function do_keys_loop(loop$list, loop$acc) {
+  while (true) {
+    let list = loop$list;
+    let acc = loop$acc;
+    if (list.hasLength(0)) {
+      return reverse_and_concat(acc, toList([]));
+    } else {
+      let first4 = list.head;
+      let rest = list.tail;
+      loop$list = rest;
+      loop$acc = prepend(first4[0], acc);
+    }
   }
 }
-function divide(a, b) {
-  if (b === 0) {
-    return new Error(void 0);
-  } else {
-    let b$1 = b;
-    return new Ok(divideFloat(a, b$1));
-  }
-}
-function add2(a, b) {
-  return a + b;
-}
-function multiply(a, b) {
-  return a * b;
-}
-function subtract(a, b) {
-  return a - b;
+function keys(dict) {
+  let list_of_pairs = map_to_list(dict);
+  return do_keys_loop(list_of_pairs, toList([]));
 }
 
 // build/dev/javascript/gleam_stdlib/gleam/bool.mjs
@@ -2365,31 +2586,31 @@ if (globalThis.customElements && !globalThis.customElements.get("lustre-fragment
     }
   );
 }
-function morph(prev, next, dispatch) {
+function morph(prev, next2, dispatch) {
   let out;
-  let stack = [{ prev, next, parent: prev.parentNode }];
+  let stack = [{ prev, next: next2, parent: prev.parentNode }];
   while (stack.length) {
-    let { prev: prev2, next: next2, parent } = stack.pop();
-    while (next2.subtree !== void 0)
-      next2 = next2.subtree();
-    if (next2.content !== void 0) {
+    let { prev: prev2, next: next3, parent } = stack.pop();
+    while (next3.subtree !== void 0)
+      next3 = next3.subtree();
+    if (next3.content !== void 0) {
       if (!prev2) {
-        const created = document.createTextNode(next2.content);
+        const created = document.createTextNode(next3.content);
         parent.appendChild(created);
         out ??= created;
       } else if (prev2.nodeType === Node.TEXT_NODE) {
-        if (prev2.textContent !== next2.content)
-          prev2.textContent = next2.content;
+        if (prev2.textContent !== next3.content)
+          prev2.textContent = next3.content;
         out ??= prev2;
       } else {
-        const created = document.createTextNode(next2.content);
+        const created = document.createTextNode(next3.content);
         parent.replaceChild(created, prev2);
         out ??= created;
       }
-    } else if (next2.tag !== void 0) {
+    } else if (next3.tag !== void 0) {
       const created = createElementNode({
         prev: prev2,
-        next: next2,
+        next: next3,
         dispatch,
         stack
       });
@@ -2403,10 +2624,10 @@ function morph(prev, next, dispatch) {
   }
   return out;
 }
-function createElementNode({ prev, next, dispatch, stack }) {
-  const namespace = next.namespace || "http://www.w3.org/1999/xhtml";
-  const canMorph = prev && prev.nodeType === Node.ELEMENT_NODE && prev.localName === next.tag && prev.namespaceURI === (next.namespace || "http://www.w3.org/1999/xhtml");
-  const el = canMorph ? prev : namespace ? document.createElementNS(namespace, next.tag) : document.createElement(next.tag);
+function createElementNode({ prev, next: next2, dispatch, stack }) {
+  const namespace = next2.namespace || "http://www.w3.org/1999/xhtml";
+  const canMorph = prev && prev.nodeType === Node.ELEMENT_NODE && prev.localName === next2.tag && prev.namespaceURI === (next2.namespace || "http://www.w3.org/1999/xhtml");
+  const el = canMorph ? prev : namespace ? document.createElementNS(namespace, next2.tag) : document.createElement(next2.tag);
   let handlersForEl;
   if (!registeredHandlers.has(el)) {
     const emptyHandlers = /* @__PURE__ */ new Map();
@@ -2420,13 +2641,13 @@ function createElementNode({ prev, next, dispatch, stack }) {
   let className = null;
   let style2 = null;
   let innerHTML = null;
-  if (canMorph && next.tag === "textarea") {
-    const innertText = next.children[Symbol.iterator]().next().value?.content;
+  if (canMorph && next2.tag === "textarea") {
+    const innertText = next2.children[Symbol.iterator]().next().value?.content;
     if (innertText !== void 0)
       el.value = innertText;
   }
   const delegated = [];
-  for (const attr of next.attrs) {
+  for (const attr of next2.attrs) {
     const name = attr[0];
     const value = attr[1];
     if (attr.as_property) {
@@ -2492,7 +2713,7 @@ function createElementNode({ prev, next, dispatch, stack }) {
       el.removeEventListener(eventName, lustreGenericEventHandler);
     }
   }
-  if (next.tag === "slot") {
+  if (next2.tag === "slot") {
     window.queueMicrotask(() => {
       for (const child of el.assignedElements()) {
         for (const [name, value] of delegated) {
@@ -2503,8 +2724,8 @@ function createElementNode({ prev, next, dispatch, stack }) {
       }
     });
   }
-  if (next.key !== void 0 && next.key !== "") {
-    el.setAttribute("data-lustre-key", next.key);
+  if (next2.key !== void 0 && next2.key !== "") {
+    el.setAttribute("data-lustre-key", next2.key);
   } else if (innerHTML !== null) {
     el.innerHTML = innerHTML;
     return el;
@@ -2513,14 +2734,14 @@ function createElementNode({ prev, next, dispatch, stack }) {
   let seenKeys = null;
   let keyedChildren = null;
   let incomingKeyedChildren = null;
-  let firstChild = children(next).next().value;
+  let firstChild = children(next2).next().value;
   if (canMorph && firstChild !== void 0 && // Explicit checks are more verbose but truthy checks force a bunch of comparisons
   // we don't care about: it's never gonna be a number etc.
   firstChild.key !== void 0 && firstChild.key !== "") {
     seenKeys = /* @__PURE__ */ new Set();
     keyedChildren = getKeyedChildren(prev);
-    incomingKeyedChildren = getKeyedChildren(next);
-    for (const child of children(next)) {
+    incomingKeyedChildren = getKeyedChildren(next2);
+    for (const child of children(next2)) {
       prevChild = diffKeyedChild(
         prevChild,
         child,
@@ -2532,15 +2753,15 @@ function createElementNode({ prev, next, dispatch, stack }) {
       );
     }
   } else {
-    for (const child of children(next)) {
+    for (const child of children(next2)) {
       stack.unshift({ prev: prevChild, next: child, parent: el });
       prevChild = prevChild?.nextSibling;
     }
   }
   while (prevChild) {
-    const next2 = prevChild.nextSibling;
+    const next3 = prevChild.nextSibling;
     el.removeChild(prevChild);
-    prevChild = next2;
+    prevChild = next3;
   }
   return el;
 }
@@ -2773,9 +2994,9 @@ var LustreClientApplication = class _LustreClientApplication {
   #flush(effects = []) {
     while (this.#queue.length > 0) {
       const msg = this.#queue.shift();
-      const [next, effect] = this.#update(this.#model, msg);
+      const [next2, effect] = this.#update(this.#model, msg);
       effects = effects.concat(effect.all.toArray());
-      this.#model = next;
+      this.#model = next2;
     }
     while (effects.length > 0) {
       const effect = effects.shift();
@@ -2884,9 +3105,9 @@ var LustreServerApplication = class _LustreServerApplication {
   #flush(effects = []) {
     while (this.#queue.length > 0) {
       const msg = this.#queue.shift();
-      const [next, effect] = this.#update(this.#model, msg);
+      const [next2, effect] = this.#update(this.#model, msg);
       effects = effects.concat(effect.all.toArray());
-      this.#model = next;
+      this.#model = next2;
     }
     while (effects.length > 0) {
       const effect = effects.shift();
@@ -2949,6 +3170,9 @@ function text2(content) {
 function div(attrs, children2) {
   return element("div", attrs, children2);
 }
+function p(attrs, children2) {
+  return element("p", attrs, children2);
+}
 function canvas(attrs) {
   return element("canvas", attrs, toList([]));
 }
@@ -3005,6 +3229,10 @@ function with_keyboard_data(cb) {
 }
 function add_keyboard_event_listener(cb) {
   return window.addEventListener("keydown", with_keyboard_data(cb));
+}
+function add_game_focus_event_listener(cb) {
+  window.addEventListener("focus", () => cb(true));
+  window.addEventListener("blur", () => cb(false));
 }
 
 // build/dev/javascript/client/lib/input.mjs
@@ -3088,20 +3316,20 @@ var Coord = class extends CustomType {
 function at(x3, y3, z) {
   return new Coord(x3, y3, z);
 }
-function move(from2, by) {
-  return new Coord(max(from2.x + by.x, 0), max(from2.y + by.y, 0), by.z);
+function move(from3, by) {
+  return new Coord(max(from3.x + by.x, 0), max(from3.y + by.y, 0), by.z);
 }
-function add_elevation(from2, z) {
-  return move(from2, new Coord(0, 0, from2.z + z));
+function add_elevation(from3, z) {
+  return move(from3, new Coord(0, 0, from3.z + z));
 }
-function set_elevation(from2, z) {
-  return move(from2, new Coord(0, 0, max(z, 0)));
+function set_elevation(from3, z) {
+  return move(from3, new Coord(0, 0, max(z, 0)));
 }
 function sum(coord) {
   return coord.x + coord.y * 10;
 }
 function compare3(a, b) {
-  return compare(sum(a), sum(b));
+  return compare2(sum(a), sum(b));
 }
 function equal(a, b) {
   return a.x === b.x && a.y === b.y && a.z === b.z;
@@ -3125,7 +3353,7 @@ var Double = class extends CustomType {
 };
 var Triple = class extends CustomType {
 };
-function scale(from2, amount) {
+function scale(from3, amount) {
   let by = (() => {
     if (amount instanceof Single) {
       return 1;
@@ -3137,7 +3365,7 @@ function scale(from2, amount) {
       return 4;
     }
   })();
-  return multiply(from2, by);
+  return multiply(from3, by);
 }
 
 // build/dev/javascript/client/lib/camera.mjs
@@ -3168,7 +3396,8 @@ function get_viewport(camera, scale2) {
   ];
 }
 function set_focus(camera, focus) {
-  return camera.withFields({ focus });
+  let _record = camera;
+  return new Camera(focus, _record.width, _record.height);
 }
 var width2 = 320;
 var height2 = 180;
@@ -3223,6 +3452,39 @@ function load_image(src) {
   return image;
 }
 
+// build/dev/javascript/client/lib/classnames.mjs
+var Static = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var Conditional = class extends CustomType {
+  constructor(x0, x1) {
+    super();
+    this[0] = x0;
+    this[1] = x1;
+  }
+};
+function from2(class_list) {
+  let _pipe = class_list;
+  let _pipe$1 = filter_map(
+    _pipe,
+    (cn) => {
+      if (cn instanceof Static) {
+        let name = cn[0];
+        return new Ok(name);
+      } else if (cn instanceof Conditional && cn[0]) {
+        let name = cn[1];
+        return new Ok(name);
+      } else {
+        return new Error("Omit");
+      }
+    }
+  );
+  return join(_pipe$1, " ");
+}
+
 // build/dev/javascript/gleam_community_maths/maths.mjs
 function sin(float3) {
   return Math.sin(float3);
@@ -3256,8 +3518,8 @@ function x(vec) {
 function y(vec) {
   return vec.y;
 }
-function move2(from2, by) {
-  return at2(add2(from2.x, by.x), add2(from2.y, by.y));
+function move2(from3, by) {
+  return at2(add(from3.x, by.x), add(from3.y, by.y));
 }
 var half_width = 16;
 var half_height = 8;
@@ -3289,18 +3551,25 @@ var SpriteRegion = class extends CustomType {
   }
 };
 var SpriteSheet = class extends CustomType {
-  constructor(asset, grid, sprites3) {
+  constructor(asset, grid, sprites4) {
     super();
     this.asset = asset;
     this.grid = grid;
-    this.sprites = sprites3;
+    this.sprites = sprites4;
+  }
+};
+var Grid = class extends CustomType {
+  constructor(width3, height3) {
+    super();
+    this.width = width3;
+    this.height = height3;
   }
 };
 function x2(sr, grid) {
-  return sr.x * grid;
+  return sr.x * grid.width;
 }
 function y2(sr, grid) {
-  return sr.y * grid;
+  return sr.y * grid.height;
 }
 function render(context, sheet, sprite_region, at3, scale2) {
   return draw_image_cropped(
@@ -3315,11 +3584,11 @@ function render(context, sheet, sprite_region, at3, scale2) {
       return identity(_pipe);
     })(),
     (() => {
-      let _pipe = sheet.grid;
+      let _pipe = sheet.grid.width;
       return identity(_pipe);
     })(),
     (() => {
-      let _pipe = sheet.grid;
+      let _pipe = sheet.grid.height;
       return identity(_pipe);
     })(),
     (() => {
@@ -3331,12 +3600,12 @@ function render(context, sheet, sprite_region, at3, scale2) {
       return scale(_pipe, scale2);
     })(),
     (() => {
-      let _pipe = sheet.grid;
+      let _pipe = sheet.grid.width;
       let _pipe$1 = identity(_pipe);
       return scale(_pipe$1, scale2);
     })(),
     (() => {
-      let _pipe = sheet.grid;
+      let _pipe = sheet.grid.height;
       let _pipe$1 = identity(_pipe);
       return scale(_pipe$1, scale2);
     })()
@@ -3364,7 +3633,7 @@ function sprite_sheet() {
     load_image(
       "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/cursor.png"
     ),
-    32,
+    new Grid(32, 32),
     from_list(sprites)
   );
 }
@@ -3377,12 +3646,18 @@ function max_update_frames() {
   return 6;
 }
 
+// build/dev/javascript/client/lib/frames.mjs
+var dt_s = 0.01667;
+function to_duration(count) {
+  return multiply(dt_s, identity(count));
+}
+
 // build/dev/javascript/client/lib/cursor.mjs
 var Cursor = class extends CustomType {
-  constructor(position, sprite_sheet3, animation) {
+  constructor(position, sprite_sheet4, animation) {
     super();
     this.position = position;
-    this.sprite_sheet = sprite_sheet3;
+    this.sprite_sheet = sprite_sheet4;
     this.animation = animation;
   }
 };
@@ -3394,16 +3669,32 @@ var CursorAnimation = class extends CustomType {
     this.amplitude = amplitude;
   }
 };
+function cursor_animation() {
+  return new CursorAnimation(0, to_duration(6e4), 1);
+}
+function new$4(position) {
+  return new Cursor(position, sprite_sheet(), cursor_animation());
+}
 function update(cursor) {
   let updated_elapsed = (() => {
     let _pipe = cursor.animation.elapsed;
-    let _pipe$1 = add2(_pipe, fixed_dt());
+    let _pipe$1 = add(_pipe, fixed_dt());
     let _pipe$2 = modulo(_pipe$1, cursor.animation.cycle);
     return unwrap(_pipe$2, 0);
   })();
-  return cursor.withFields({
-    animation: cursor.animation.withFields({ elapsed: updated_elapsed })
-  });
+  let _record = cursor;
+  return new Cursor(
+    _record.position,
+    _record.sprite_sheet,
+    (() => {
+      let _record$1 = cursor.animation;
+      return new CursorAnimation(
+        updated_elapsed,
+        _record$1.cycle,
+        _record$1.amplitude
+      );
+    })()
+  );
 }
 function render_base(context, cursor, coords, camera, scale2) {
   let $ = equal(cursor.position, coords);
@@ -3441,7 +3732,7 @@ function render_pointer(context, cursor, coords, camera, scale2) {
       let region$1 = region[0];
       let vec = (() => {
         let _pipe = coords;
-        let _pipe$1 = add_elevation(_pipe, 3);
+        let _pipe$1 = add_elevation(_pipe, 6);
         return from_coord(_pipe$1, camera);
       })();
       let y_offset = (() => {
@@ -3468,16 +3759,103 @@ function render_pointer(context, cursor, coords, camera, scale2) {
     }
   }
 }
-var cursor_animation = /* @__PURE__ */ new CursorAnimation(0, 0.9, 1);
-function new$4(position) {
-  return new Cursor(position, sprite_sheet(), cursor_animation);
+
+// build/dev/javascript/client/lib/asset/roku.mjs
+var Idle = class extends CustomType {
+};
+function get_sprite_key2(variant, direction) {
+  if (variant instanceof Idle && direction instanceof Up) {
+    return "IdleUp";
+  } else if (variant instanceof Idle && direction instanceof Down) {
+    return "IdleDown";
+  } else if (variant instanceof Idle && direction instanceof Left) {
+    return "IdleLeft";
+  } else {
+    return "IdleRight";
+  }
+}
+var sprites2 = /* @__PURE__ */ toList([
+  ["IdleUp", /* @__PURE__ */ new SpriteRegion(3, 0)],
+  ["IdleDown", /* @__PURE__ */ new SpriteRegion(0, 0)],
+  ["IdleLeft", /* @__PURE__ */ new SpriteRegion(2, 0)],
+  ["IdleRight", /* @__PURE__ */ new SpriteRegion(1, 0)]
+]);
+function sprite_sheet2() {
+  return new SpriteSheet(
+    load_image(
+      "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/test-unit.png"
+    ),
+    new Grid(32, 64),
+    from_list(sprites2)
+  );
+}
+
+// build/dev/javascript/client/lib/unit.mjs
+var Roku = class extends CustomType {
+  constructor(x0) {
+    super();
+    this[0] = x0;
+  }
+};
+var Unit = class extends CustomType {
+  constructor(id2, sprite_sheet4, direction, unitset) {
+    super();
+    this.id = id2;
+    this.sprite_sheet = sprite_sheet4;
+    this.direction = direction;
+    this.unitset = unitset;
+  }
+};
+function new$5(unitset, id2) {
+  {
+    return new Unit(id2, sprite_sheet2(), new Down(), unitset);
+  }
+}
+function get_sprite(sprite_sheet4, unitset, d) {
+  let sprite_key = (() => {
+    {
+      let variant = unitset[0];
+      return new Ok(get_sprite_key2(variant, d));
+    }
+  })();
+  let _pipe = sprite_key;
+  return try$(
+    _pipe,
+    (_capture) => {
+      return map_get(sprite_sheet4.sprites, _capture);
+    }
+  );
+}
+function render2(context, unit, coords, camera, scale2) {
+  let sprite_region = get_sprite(
+    unit.sprite_sheet,
+    unit.unitset,
+    unit.direction
+  );
+  if (sprite_region.isOk()) {
+    let region = sprite_region[0];
+    let vector = from_coord(
+      (() => {
+        let _pipe = coords;
+        return add_elevation(
+          _pipe,
+          divideInt(unit.sprite_sheet.grid.height, 16)
+        );
+      })(),
+      camera
+    );
+    render(context, unit.sprite_sheet, region, vector, scale2);
+    return void 0;
+  } else {
+    return void 0;
+  }
 }
 
 // build/dev/javascript/client/lib/entity.mjs
-var CursorEntity = class extends CustomType {
-  constructor(cursor) {
+var UnitEntity = class extends CustomType {
+  constructor(id2) {
     super();
-    this.cursor = cursor;
+    this.id = id2;
   }
 };
 
@@ -3490,6 +3868,245 @@ var MoveCursor = class extends CustomType {
 };
 function new_queue() {
   return toList([]);
+}
+
+// build/dev/javascript/gleam_yielder/gleam/yielder.mjs
+var Stop = class extends CustomType {
+};
+var Continue2 = class extends CustomType {
+  constructor(x0, x1) {
+    super();
+    this[0] = x0;
+    this[1] = x1;
+  }
+};
+var Yielder = class extends CustomType {
+  constructor(continuation) {
+    super();
+    this.continuation = continuation;
+  }
+};
+var Next = class extends CustomType {
+  constructor(element2, accumulator) {
+    super();
+    this.element = element2;
+    this.accumulator = accumulator;
+  }
+};
+function unfold_loop(initial, f) {
+  return () => {
+    let $ = f(initial);
+    if ($ instanceof Next) {
+      let x3 = $.element;
+      let acc = $.accumulator;
+      return new Continue2(x3, unfold_loop(acc, f));
+    } else {
+      return new Stop();
+    }
+  };
+}
+function unfold(initial, f) {
+  let _pipe = initial;
+  let _pipe$1 = unfold_loop(_pipe, f);
+  return new Yielder(_pipe$1);
+}
+function first3(yielder) {
+  let $ = yielder.continuation();
+  if ($ instanceof Stop) {
+    return new Error(void 0);
+  } else {
+    let e = $[0];
+    return new Ok(e);
+  }
+}
+
+// build/dev/javascript/prng/prng_ffi.mjs
+function new_seed(from3) {
+  const [state, step3] = next([0, 1013904223]);
+  const new_state = state + from3 >>> 0;
+  return next([new_state, step3]);
+}
+function next(seed) {
+  const [state, step3] = seed;
+  const new_state = state * 1664525 + step3 >>> 0;
+  return [new_state, step3];
+}
+function seed_to_int(seed) {
+  const [state, _step] = seed;
+  const shifted_state = state >>> (state >>> 28) + 4;
+  const word = (state ^ shifted_state) * 277803737;
+  return (word >>> 22 ^ word) >>> 0;
+}
+function random_int(seed, from3, to) {
+  const range = to - from3 + 1;
+  const is_power_of_2 = (range - 1 & range) === 0;
+  if (is_power_of_2) {
+    const number = (range - 1 & seed_to_int(seed)) >>> 0;
+    return [number + from3, next(seed)];
+  } else {
+    const threshold = (-range >>> 0) % range >>> 0;
+    let iteration_seed = seed;
+    let x3 = void 0;
+    do {
+      x3 = seed_to_int(iteration_seed);
+      iteration_seed = next(iteration_seed);
+    } while (x3 < threshold);
+    return [from3 + x3 % range, iteration_seed];
+  }
+}
+
+// build/dev/javascript/prng/prng/seed.mjs
+function random2() {
+  return new_seed(random(4294967296));
+}
+
+// build/dev/javascript/prng/prng/random.mjs
+var Generator = class extends CustomType {
+  constructor(step3) {
+    super();
+    this.step = step3;
+  }
+};
+function step(generator, seed) {
+  return generator.step(seed);
+}
+function to_yielder(generator, seed) {
+  return unfold(
+    seed,
+    (seed2) => {
+      let $ = step(generator, seed2);
+      let value = $[0];
+      let new_seed2 = $[1];
+      return new Next(value, new_seed2);
+    }
+  );
+}
+function to_random_yielder(generator) {
+  return to_yielder(generator, random2());
+}
+function random_sample(generator) {
+  let $ = first3(to_random_yielder(generator));
+  if (!$.isOk()) {
+    throw makeError(
+      "let_assert",
+      "prng/random",
+      196,
+      "random_sample",
+      "Pattern match failed, no pattern matched the value.",
+      { value: $ }
+    );
+  }
+  let result = $[0];
+  return result;
+}
+function sort_ascending(one, other, compare4) {
+  let $ = compare4(one, other);
+  if ($ instanceof Lt) {
+    return [one, other];
+  } else if ($ instanceof Eq) {
+    return [one, other];
+  } else {
+    return [other, one];
+  }
+}
+function int3(from3, to) {
+  return new Generator(
+    (seed) => {
+      let $ = sort_ascending(from3, to, compare2);
+      let low = $[0];
+      let high = $[1];
+      return random_int(seed, low, high);
+    }
+  );
+}
+function constant(value) {
+  return new Generator((seed) => {
+    return [value, seed];
+  });
+}
+function do_fixed_size_list(loop$acc, loop$seed, loop$generator, loop$length) {
+  while (true) {
+    let acc = loop$acc;
+    let seed = loop$seed;
+    let generator = loop$generator;
+    let length2 = loop$length;
+    let $ = length2 <= 0;
+    if ($) {
+      return [acc, seed];
+    } else {
+      let $1 = step(generator, seed);
+      let value = $1[0];
+      let seed$1 = $1[1];
+      loop$acc = prepend(value, acc);
+      loop$seed = seed$1;
+      loop$generator = generator;
+      loop$length = length2 - 1;
+    }
+  }
+}
+function fixed_size_list(generator, length2) {
+  return new Generator(
+    (seed) => {
+      return do_fixed_size_list(toList([]), seed, generator, length2);
+    }
+  );
+}
+function then$2(generator, generator_from) {
+  return new Generator(
+    (seed) => {
+      let $ = step(generator, seed);
+      let value = $[0];
+      let seed$1 = $[1];
+      let _pipe = generator_from(value);
+      return step(_pipe, seed$1);
+    }
+  );
+}
+function map4(generator, fun) {
+  return new Generator(
+    (seed) => {
+      let $ = step(generator, seed);
+      let value = $[0];
+      let seed$1 = $[1];
+      return [fun(value), seed$1];
+    }
+  );
+}
+function fixed_size_string(size) {
+  let _pipe = fixed_size_list(utf_codepoint_in_range(0, 1023), size);
+  return map4(_pipe, utf_codepoint_list_to_string);
+}
+function string3() {
+  return then$2(int3(0, 32), (size) => {
+    return fixed_size_string(size);
+  });
+}
+function bit_array() {
+  return map4(string3(), bit_array_from_string);
+}
+function utf_codepoint_in_range(lower, upper) {
+  return then$2(
+    int3(lower, upper),
+    (raw_codepoint) => {
+      let $ = utf_codepoint(raw_codepoint);
+      if ($.isOk()) {
+        let codepoint2 = $[0];
+        return constant(codepoint2);
+      } else {
+        return utf_codepoint_in_range(lower, upper);
+      }
+    }
+  );
+}
+
+// build/dev/javascript/client/lib/id.mjs
+function make_generator() {
+  return bit_array();
+}
+function step2(generator) {
+  let _pipe = generator;
+  let _pipe$1 = random_sample(_pipe);
+  return encode64(_pipe$1, true);
 }
 
 // build/dev/javascript/client/lib/asset/demo.mjs
@@ -3507,7 +4124,7 @@ var Variant5 = class extends CustomType {
 };
 var Variant6 = class extends CustomType {
 };
-function get_sprite_key2(variant) {
+function get_sprite_key3(variant) {
   if (variant instanceof Base2) {
     return "Base";
   } else if (variant instanceof Variant1) {
@@ -3524,7 +4141,7 @@ function get_sprite_key2(variant) {
     return "Variant6";
   }
 }
-var sprites2 = /* @__PURE__ */ toList([
+var sprites3 = /* @__PURE__ */ toList([
   ["Base", /* @__PURE__ */ new SpriteRegion(0, 0)],
   ["Variant1", /* @__PURE__ */ new SpriteRegion(1, 0)],
   ["Variant2", /* @__PURE__ */ new SpriteRegion(2, 0)],
@@ -3533,13 +4150,13 @@ var sprites2 = /* @__PURE__ */ toList([
   ["Variant5", /* @__PURE__ */ new SpriteRegion(5, 0)],
   ["Variant6", /* @__PURE__ */ new SpriteRegion(6, 0)]
 ]);
-function sprite_sheet2() {
+function sprite_sheet3() {
   return new SpriteSheet(
     load_image(
       "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/color-test-tiles.png"
     ),
-    32,
-    from_list(sprites2)
+    new Grid(32, 32),
+    from_list(sprites3)
   );
 }
 
@@ -3560,11 +4177,11 @@ var Demo = class extends CustomType {
 };
 var Passable = class extends CustomType {
 };
-function get_sprite(sprite_sheet3, tileset) {
+function get_sprite2(sprite_sheet4, tileset) {
   let sprite_key = (() => {
     if (tileset instanceof Demo) {
       let variant = tileset[0];
-      return new Ok(get_sprite_key2(variant));
+      return new Ok(get_sprite_key3(variant));
     } else {
       return new Error(void 0);
     }
@@ -3573,16 +4190,16 @@ function get_sprite(sprite_sheet3, tileset) {
   return try$(
     _pipe,
     (_capture) => {
-      return map_get(sprite_sheet3.sprites, _capture);
+      return map_get(sprite_sheet4.sprites, _capture);
     }
   );
 }
-function render2(context, tile, coords, sprite_sheet3, camera, scale2) {
-  let sprite_region = get_sprite(sprite_sheet3, tile.tileset);
+function render3(context, tile, coords, sprite_sheet4, camera, scale2) {
+  let sprite_region = get_sprite2(sprite_sheet4, tile.tileset);
   if (sprite_region.isOk()) {
     let region = sprite_region[0];
     let vector = from_coord(coords, camera);
-    render(context, sprite_sheet3, region, vector, scale2);
+    render(context, sprite_sheet4, region, vector, scale2);
     return void 0;
   } else {
     return void 0;
@@ -3591,14 +4208,14 @@ function render2(context, tile, coords, sprite_sheet3, camera, scale2) {
 
 // build/dev/javascript/client/lib/map.mjs
 var Map3 = class extends CustomType {
-  constructor(sprite_sheet3, tiles) {
+  constructor(sprite_sheet4, tiles) {
     super();
-    this.sprite_sheet = sprite_sheet3;
+    this.sprite_sheet = sprite_sheet4;
     this.tiles = tiles;
   }
 };
-function each_tile(map4, f) {
-  let _pipe = map4.tiles;
+function each_tile(map5, f) {
+  let _pipe = map5.tiles;
   let _pipe$1 = map_to_list(_pipe);
   let _pipe$2 = sort(
     _pipe$1,
@@ -3616,32 +4233,45 @@ function each_tile(map4, f) {
   );
 }
 
-// build/dev/javascript/client/lib/engine.mjs
+// build/dev/javascript/client/lib/state.mjs
 var GameState = class extends CustomType {
-  constructor(accumulator, camera, cursor, event_queue, fps, map4, previous_time, scale2, debug2, entity_map, location_map) {
+  constructor(accumulator, camera, cursor, event_queue, fps, map5, previous_time, scale2, debug2, entity_map, location_map, unit_map) {
     super();
     this.accumulator = accumulator;
     this.camera = camera;
     this.cursor = cursor;
     this.event_queue = event_queue;
     this.fps = fps;
-    this.map = map4;
+    this.map = map5;
     this.previous_time = previous_time;
     this.scale = scale2;
     this.debug = debug2;
     this.entity_map = entity_map;
     this.location_map = location_map;
+    this.unit_map = unit_map;
   }
 };
-function new$5(init3, map4) {
+
+// build/dev/javascript/client/lib/engine.mjs
+function new$7(init3, map5) {
   let cursor = new$4(at(3, 2, 3));
+  let generator = make_generator();
+  let unit_ref = step2(generator);
+  let unit_map = (() => {
+    let _pipe = new_map();
+    return insert(
+      _pipe,
+      unit_ref,
+      new$5(new Roku(new Idle()), unit_ref)
+    );
+  })();
   let entity_map = (() => {
     let _pipe = new_map();
-    return insert(_pipe, "cursor", new CursorEntity(cursor));
+    return insert(_pipe, unit_ref, new UnitEntity(unit_ref));
   })();
   let location_map = (() => {
     let _pipe = new_map();
-    return insert(_pipe, at(3, 2, 3), toList(["cursor"]));
+    return insert(_pipe, at(3, 2, 3), toList([unit_ref]));
   })();
   return new GameState(
     0,
@@ -3649,12 +4279,30 @@ function new$5(init3, map4) {
     new$4(at(3, 2, 3)),
     new_queue(),
     0,
-    map4,
+    map5,
     init3,
     new Double(),
     false,
     entity_map,
-    location_map
+    location_map,
+    unit_map
+  );
+}
+function paused_update(game_state, current_time) {
+  let _record = game_state;
+  return new GameState(
+    _record.accumulator,
+    _record.camera,
+    _record.cursor,
+    _record.event_queue,
+    _record.fps,
+    _record.map,
+    current_time,
+    _record.scale,
+    _record.debug,
+    _record.entity_map,
+    _record.location_map,
+    _record.unit_map
   );
 }
 function calc_frame_time(game_state, current_time) {
@@ -3662,7 +4310,7 @@ function calc_frame_time(game_state, current_time) {
 }
 function update_time(game_state, current_time) {
   let time_since_last_frame = calc_frame_time(game_state, current_time);
-  let accumulator = add2(game_state.accumulator, time_since_last_frame);
+  let accumulator = add(game_state.accumulator, time_since_last_frame);
   let fps = (() => {
     let $ = divide(1e3, time_since_last_frame);
     if ($.isOk()) {
@@ -3672,14 +4320,38 @@ function update_time(game_state, current_time) {
       return 60;
     }
   })();
-  return game_state.withFields({
+  let _record = game_state;
+  return new GameState(
     accumulator,
+    _record.camera,
+    _record.cursor,
+    _record.event_queue,
     fps,
-    previous_time: current_time
-  });
+    _record.map,
+    current_time,
+    _record.scale,
+    _record.debug,
+    _record.entity_map,
+    _record.location_map,
+    _record.unit_map
+  );
 }
 function reset_events(game_state) {
-  return game_state.withFields({ event_queue: toList([]) });
+  let _record = game_state;
+  return new GameState(
+    _record.accumulator,
+    _record.camera,
+    _record.cursor,
+    toList([]),
+    _record.fps,
+    _record.map,
+    _record.previous_time,
+    _record.scale,
+    _record.debug,
+    _record.entity_map,
+    _record.location_map,
+    _record.unit_map
+  );
 }
 function apply_events(game_state) {
   let _pipe = fold_right(
@@ -3714,10 +4386,28 @@ function apply_events(game_state) {
                 })(_pipe$3);
               }
             })();
-            return game_state.withFields({
+            let _record = game_state;
+            return new GameState(
+              _record.accumulator,
               camera,
-              cursor: game_state.cursor.withFields({ position })
-            });
+              (() => {
+                let _record$1 = game_state.cursor;
+                return new Cursor(
+                  position,
+                  _record$1.sprite_sheet,
+                  _record$1.animation
+                );
+              })(),
+              _record.event_queue,
+              _record.fps,
+              _record.map,
+              _record.previous_time,
+              _record.scale,
+              _record.debug,
+              _record.entity_map,
+              _record.location_map,
+              _record.unit_map
+            );
           } else {
             return game_state;
           }
@@ -3738,7 +4428,21 @@ function is_gt_or_eq(order) {
 }
 function update_entities(game_state) {
   let new_cursor = update(game_state.cursor);
-  return game_state.withFields({ cursor: new_cursor });
+  let _record = game_state;
+  return new GameState(
+    _record.accumulator,
+    _record.camera,
+    new_cursor,
+    _record.event_queue,
+    _record.fps,
+    _record.map,
+    _record.previous_time,
+    _record.scale,
+    _record.debug,
+    _record.entity_map,
+    _record.location_map,
+    _record.unit_map
+  );
 }
 function update_loop(loop$game_state, loop$accumulator, loop$loop_count) {
   while (true) {
@@ -3746,7 +4450,7 @@ function update_loop(loop$game_state, loop$accumulator, loop$loop_count) {
     let accumulator = loop$accumulator;
     let loop_count = loop$loop_count;
     let has_pending_frames = (() => {
-      let _pipe = compare2(accumulator, fixed_dt());
+      let _pipe = compare(accumulator, fixed_dt());
       return is_gt_or_eq(_pipe);
     })();
     let $ = has_pending_frames && loop_count <= max_update_frames();
@@ -3758,7 +4462,21 @@ function update_loop(loop$game_state, loop$accumulator, loop$loop_count) {
       loop$accumulator = subtract(accumulator, fixed_dt());
       loop$loop_count = loop_count + 1;
     } else {
-      return game_state.withFields({ accumulator });
+      let _record = game_state;
+      return new GameState(
+        accumulator,
+        _record.camera,
+        _record.cursor,
+        _record.event_queue,
+        _record.fps,
+        _record.map,
+        _record.previous_time,
+        _record.scale,
+        _record.debug,
+        _record.entity_map,
+        _record.location_map,
+        _record.unit_map
+      );
     }
   }
 }
@@ -3767,7 +4485,24 @@ function update2(game_state, current_time) {
   return update_loop(updated, updated.accumulator, 0);
 }
 function toggle_debug(game_state) {
-  return game_state.withFields({ debug: !game_state.debug });
+  let _record = game_state;
+  return new GameState(
+    _record.accumulator,
+    _record.camera,
+    _record.cursor,
+    _record.event_queue,
+    _record.fps,
+    _record.map,
+    _record.previous_time,
+    _record.scale,
+    !game_state.debug,
+    _record.entity_map,
+    _record.location_map,
+    _record.unit_map
+  );
+}
+function on_game_focus(cb) {
+  return add_game_focus_event_listener(cb);
 }
 
 // build/dev/javascript/client/lib/map/demo_one.mjs
@@ -3778,7 +4513,7 @@ function new_tile(variant, elevation) {
     elevation
   );
 }
-function new$6() {
+function new$8() {
   let tiles = from_list(
     toList([
       [at(0, 0, 0), new_tile(new Variant2(), 1)],
@@ -3939,7 +4674,7 @@ function new$6() {
       [at(12, 11, 0), new_tile(new Base2(), 3)]
     ])
   );
-  return new Map3(sprite_sheet2(), tiles);
+  return new Map3(sprite_sheet3(), tiles);
 }
 
 // build/dev/javascript/client/lib/render.mjs
@@ -3950,6 +4685,30 @@ var RenderContext = class extends CustomType {
     this[1] = x1;
   }
 };
+function entity(ref, context, coords, game_state) {
+  let entity_result = map_get(game_state.entity_map, ref);
+  if (entity_result.isOk()) {
+    let entity$1 = entity_result[0];
+    {
+      let unit_ref = entity$1.id;
+      let unit_result = map_get(game_state.unit_map, unit_ref);
+      if (unit_result.isOk()) {
+        let unit = unit_result[0];
+        return render2(
+          context,
+          unit,
+          coords,
+          game_state.camera,
+          game_state.scale
+        );
+      } else {
+        return void 0;
+      }
+    }
+  } else {
+    return void 0;
+  }
+}
 var render_target_id = "ds_render_target";
 function with_context() {
   let canvas_result = get_canvas_by_id(render_target_id);
@@ -3964,11 +4723,17 @@ function with_context() {
 }
 
 // build/dev/javascript/client/client.mjs
-var Idle = class extends CustomType {
+var Idle2 = class extends CustomType {
 };
 var NoCanvas = class extends CustomType {
 };
 var Ready = class extends CustomType {
+  constructor(game_state) {
+    super();
+    this.game_state = game_state;
+  }
+};
+var Paused = class extends CustomType {
   constructor(game_state) {
     super();
     this.game_state = game_state;
@@ -3990,14 +4755,31 @@ var PlayerQueueEvent = class extends CustomType {
     this[0] = x0;
   }
 };
+var BrowserPauseGame = class extends CustomType {
+};
+var BrowserUnpauseGame = class extends CustomType {
+};
 function setup_listeners() {
   return from(
     (dispatch) => {
-      return on_keyboard_event(
+      on_keyboard_event(
         (game_key) => {
           let direction = from_game_key(game_key);
           return dispatch(
             new PlayerQueueEvent(new MoveCursor(direction))
+          );
+        }
+      );
+      return on_game_focus(
+        (focused) => {
+          return dispatch(
+            (() => {
+              if (focused) {
+                return new BrowserUnpauseGame();
+              } else {
+                return new BrowserPauseGame();
+              }
+            })()
           );
         }
       );
@@ -4016,7 +4798,7 @@ function schedule_next_frame() {
   );
 }
 function init2(_) {
-  return [new Idle(), schedule_next_frame()];
+  return [new Idle2(), schedule_next_frame()];
 }
 function get_canvas_dimensions(model) {
   if (model instanceof Ready) {
@@ -4030,7 +4812,7 @@ function get_canvas_dimensions(model) {
           })(),
           game_state.scale
         );
-        return round(_pipe);
+        return round2(_pipe);
       })(),
       (() => {
         let _pipe = scale(
@@ -4040,7 +4822,7 @@ function get_canvas_dimensions(model) {
           })(),
           game_state.scale
         );
-        return round(_pipe);
+        return round2(_pipe);
       })()
     ];
   } else {
@@ -4060,7 +4842,15 @@ function get_show_debug(model) {
     return [false, "none"];
   }
 }
-function render3(game_state) {
+function get_fps(model) {
+  if (model instanceof Ready) {
+    let game_state = model.game_state;
+    return game_state.fps;
+  } else {
+    return 0;
+  }
+}
+function render4(game_state) {
   return from(
     (_) => {
       let $ = with_context();
@@ -4083,7 +4873,7 @@ function render3(game_state) {
             return each_tile(
               _pipe,
               (coords, tile) => {
-                render2(
+                render3(
                   context,
                   tile,
                   coords,
@@ -4098,6 +4888,25 @@ function render3(game_state) {
                   game_state.camera,
                   game_state.scale
                 );
+                let $1 = (() => {
+                  let _pipe$1 = map_get(game_state.location_map, coords);
+                  return map2(
+                    _pipe$1,
+                    (_capture) => {
+                      return each(
+                        _capture,
+                        (ref) => {
+                          return entity(
+                            ref,
+                            context,
+                            coords,
+                            game_state
+                          );
+                        }
+                      );
+                    }
+                  );
+                })();
                 return render_pointer(
                   context,
                   game_state.cursor,
@@ -4113,7 +4922,7 @@ function render3(game_state) {
         throw makeError(
           "panic",
           "client",
-          255,
+          328,
           "",
           "`panic` expression evaluated.",
           {}
@@ -4123,10 +4932,7 @@ function render3(game_state) {
   );
 }
 function update_and_schedule(game_state) {
-  return [
-    new Ready(game_state),
-    batch(toList([render3(game_state), schedule_next_frame()]))
-  ];
+  return batch(toList([render4(game_state), schedule_next_frame()]));
 }
 function update3(model, msg) {
   if (msg instanceof AppSetNoCanvas) {
@@ -4137,17 +4943,26 @@ function update3(model, msg) {
       let game_state = model.game_state;
       let _pipe = game_state;
       let _pipe$1 = update2(_pipe, current_time);
-      return update_and_schedule(_pipe$1);
-    } else if (model instanceof Idle) {
+      return ((game_state2) => {
+        return [new Ready(game_state2), update_and_schedule(game_state2)];
+      })(_pipe$1);
+    } else if (model instanceof Paused) {
+      let game_state = model.game_state;
+      let _pipe = game_state;
+      let _pipe$1 = paused_update(_pipe, current_time);
+      return ((game_state2) => {
+        return [new Paused(game_state2), update_and_schedule(game_state2)];
+      })(_pipe$1);
+    } else if (model instanceof Idle2) {
       return [
-        new Ready(new$5(current_time, new$6())),
+        new Ready(new$7(current_time, new$8())),
         batch(toList([setup_listeners(), schedule_next_frame()]))
       ];
     } else {
       throw makeError(
         "panic",
         "client",
-        69,
+        86,
         "update",
         "`panic` expression evaluated.",
         {}
@@ -4159,9 +4974,23 @@ function update3(model, msg) {
       let game_state = model.game_state;
       return [
         new Ready(
-          game_state.withFields({
-            event_queue: prepend(event2, game_state.event_queue)
-          })
+          (() => {
+            let _record = game_state;
+            return new GameState(
+              _record.accumulator,
+              _record.camera,
+              _record.cursor,
+              prepend(event2, game_state.event_queue),
+              _record.fps,
+              _record.map,
+              _record.previous_time,
+              _record.scale,
+              _record.debug,
+              _record.entity_map,
+              _record.location_map,
+              _record.unit_map
+            );
+          })()
         ),
         none()
       ];
@@ -4169,16 +4998,30 @@ function update3(model, msg) {
       throw makeError(
         "panic",
         "client",
-        83,
+        100,
         "update",
         "`panic` expression evaluated.",
         {}
       );
     }
-  } else {
+  } else if (msg instanceof ToggleDebug) {
     if (model instanceof Ready) {
       let game_state = model.game_state;
       return [new Ready(toggle_debug(game_state)), none()];
+    } else {
+      return [model, none()];
+    }
+  } else if (msg instanceof BrowserPauseGame) {
+    if (model instanceof Ready) {
+      let game_state = model.game_state;
+      return [new Paused(game_state), none()];
+    } else {
+      return [model, none()];
+    }
+  } else {
+    if (model instanceof Paused) {
+      let game_state = model.game_state;
+      return [new Ready(game_state), none()];
     } else {
       return [model, none()];
     }
@@ -4207,6 +5050,18 @@ function view(model) {
   let $1 = get_show_debug(model);
   let is_debug = $1[0];
   let debug_display = $1[1];
+  let fps = get_fps(model);
+  let state = (() => {
+    if (model instanceof Idle2) {
+      return "Idle";
+    } else if (model instanceof Ready) {
+      return "Ready";
+    } else if (model instanceof Paused) {
+      return "Paused";
+    } else {
+      return "NoCanvas";
+    }
+  })();
   return div(
     toList([
       class$("flex flex-col gap-2"),
@@ -4269,6 +5124,29 @@ function view(model) {
               ),
               text2("Debug")
             ])
+          ),
+          p(
+            toList([
+              class$(
+                from2(
+                  toList([
+                    new Static("font-mono text-sm"),
+                    new Conditional(!is_debug, "hidden")
+                  ])
+                )
+              )
+            ]),
+            toList([text2(float_to_string(fps))])
+          ),
+          p(
+            toList([
+              class$(
+                from2(
+                  toList([new Static("font-mono text-sm")])
+                )
+              )
+            ]),
+            toList([text2(state)])
           )
         ])
       )
@@ -4282,7 +5160,7 @@ function main() {
     throw makeError(
       "let_assert",
       "client",
-      29,
+      34,
       "main",
       "Pattern match failed, no pattern matched the value.",
       { value: $ }

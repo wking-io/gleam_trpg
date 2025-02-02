@@ -25,7 +25,8 @@ pub fn get_sprite_key(variant: DemoVariant) {
 }
 
 const sprites = [
-  #("Base", sprite.SpriteRegion(0, 0)), #("Variant1", sprite.SpriteRegion(1, 0)),
+  #("Base", sprite.SpriteRegion(0, 0)),
+  #("Variant1", sprite.SpriteRegion(1, 0)),
   #("Variant2", sprite.SpriteRegion(2, 0)),
   #("Variant3", sprite.SpriteRegion(3, 0)),
   #("Variant4", sprite.SpriteRegion(4, 0)),
@@ -38,7 +39,7 @@ pub fn sprite_sheet() -> sprite.SpriteSheet {
     asset: asset.load_image(
       "https://pub-e304780d47a742ad9bad4f35844cd6e6.r2.dev/color-test-tiles.png",
     ),
-    grid: 32,
+    grid: sprite.Grid(32, 32),
     sprites: dict.from_list(sprites),
   )
 }

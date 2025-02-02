@@ -12,17 +12,21 @@ pub type SpriteRegion {
 pub type SpriteSheet {
   SpriteSheet(
     asset: asset.Asset,
-    grid: Int,
+    grid: Grid,
     sprites: dict.Dict(String, SpriteRegion),
   )
 }
 
-pub fn x(sr: SpriteRegion, grid: Int) {
-  sr.x * grid
+pub type Grid {
+  Grid(width: Int, height: Int)
 }
 
-pub fn y(sr: SpriteRegion, grid: Int) {
-  sr.y * grid
+pub fn x(sr: SpriteRegion, grid: Grid) {
+  sr.x * grid.width
+}
+
+pub fn y(sr: SpriteRegion, grid: Grid) {
+  sr.y * grid.height
 }
 
 pub fn render(
@@ -37,11 +41,11 @@ pub fn render(
     sheet.asset,
     x(sprite_region, sheet.grid) |> int.to_float,
     y(sprite_region, sheet.grid) |> int.to_float,
-    sheet.grid |> int.to_float,
-    sheet.grid |> int.to_float,
+    sheet.grid.width |> int.to_float,
+    sheet.grid.height |> int.to_float,
     vector.x(at) |> math.scale(scale),
     vector.y(at) |> math.scale(scale),
-    sheet.grid |> int.to_float |> math.scale(scale),
-    sheet.grid |> int.to_float |> math.scale(scale),
+    sheet.grid.width |> int.to_float |> math.scale(scale),
+    sheet.grid.height |> int.to_float |> math.scale(scale),
   )
 }
